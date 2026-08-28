@@ -1,0 +1,155 @@
+# FlowPilot — Vercel Deployment Guide
+
+> Step-by-step: from this repository to a live, shareable FlowPilot URL.
+> Companion reference: `ENVIRONMENT_VARIABLES.md` · Audit: `VERCEL_AUDIT.md`.
+> Requirements: a [Neon](https://neon.tech) PostgreSQL database and (for the
+> GitHub-connected flow) the repo pushed to GitHub (`pnpm release` handles that).
+
+## TL;DR
+
+1. Neon database exists + schema applied (`pnpm db:deploy` from desktop).
+2. Push repo to GitHub (private).
+3. Vercel → Import the repo → add the 4 environment variables → Deploy.
+4. Open `https://<your-app>.vercel.app/api/health` → `{"status":"ok",…}`.
+5. Sign in with the demo credentials (after `pnpm db:seed` on the demo DB).
+
+---
+
+## SECTION 1 — Create Vercel Project
+
+1. Sign up / log in at [vercel.com](https://vercel.com) (free Hobby plan is
+   enough for pilots; the team's Pro plan works identically).
+2. Click **Add New… → Project**.
+3. Do **not** continue past the import screen yet — the repository must be on
+   GitHub first (Section 2). If you prefer deploying straight from this
+   machine without GitHub, see **CLI path** at the end of Section 2.
+4. When prompted, **do not** create a database through Vercel's marketplace
+   wizard — FlowPilot uses its own Neon project (Architecture: Vercel + Neon).
+
+What Vercel auto-detects from the repo (no action needed):
+
+| Setting         | Detected value                                        |
+| --------------- | ----------------------------------------------------- |
+| Framework       | Next.js (16, App Router)                              |
+| Package manager | pnpm (`packageManager` field + `pnpm-lock.yaml`)      |
+| Build command   | `pnpm db:generate && pnpm build` (from `vercel.json`) |
+| Node.js         | default (satisfies `engines.node >= 20.9.0`)          |
+
+## SECTION 2 — Connect GitHub Repository
+
+1. Push the repository to GitHub if not done yet:
+
+   ```bash
+   gh auth login          # once per machine
+   pnpm release           # gated: creates private repo flowpilot + pushes main
+   ```
+
+   (Manual equivalent: `docs/RELEASE_PROCESS.md`.)
+
+2. Back in Vercel **Add New… → Project**, find the private `flowpilot` repo
+   (grant Vercel access to private repos when asked) and press **Import**.
+3. Pick a project name — it becomes the URL: `<name>.vercel.app`
+   (e.g. `flowpilot-demo` → `https://flowpilot-demo.vercel.app`).
+4. Leave the Framework/Build settings as auto-detected (they come from
+   `vercel.json`).
+
+**CLI path (no GitHub needed):** deploy directly from this machine instead —
+
+```bash
+pnpm deploy:check              # env + full quality gate first
+pnpm dlx vercel@latest login   # once per machine
+pnpm dlx vercel@latest link    # once per project (follow prompts)
+pnpm deploy:preview            # preview deployment
+pnpm deploy:vercel             # production deployment
+```
+
+Every push to `main` (GitHub flow) then redeploys automatically — that is the
+"easy to redeploy" loop: `pnpm verify` → commit → push → Vercel builds.
+
+## SECTION 3 — Configure Environment Variables
+
+**This must be done BEFORE the first deploy** — the build fails fast
+(Arabic Zod error) if any variable is missing.
+
+In Vercel: **Project → Settings → Environment Variables**, add each of the
+four (see `ENVIRONMENT_VARIABLES.md` for exact formats and generation):
+
+| Name                  | Example value                     | Environments        |
+| --------------------- | --------------------------------- | ------------------- |
+| `DATABASE_URL`        | `postgresql://…​?sslmode=require` | Production, Preview |
+| `BETTER_AUTH_SECRET`  | 64-char random string             | Production, Preview |
+| `BETTER_AUTH_URL`     | `https://<your-app>.vercel.app`   | Production, Preview |
+| `NEXT_PUBLIC_APP_URL` | `https://<your-app>.vercel.app`   | Production, Preview |
+
+Rules that bite:
+
+- Generate the secret once and reuse it everywhere (`node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"`).
+  A different secret per environment invalidates sessions of the other one.
+- `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` must match the **production**
+  domain. `NEXT_PUBLIC_APP_URL` is baked in at build time.
+- Preview deployments share these values → test auth flows on the production
+  domain (preview hosts are not in `trustedOrigins`).
+- Apply the database schema **before** the first successful deploy:
+
+  ```bash
+  pnpm db:deploy     # prisma migrate deploy — run from desktop (not Termux)
+  ```
+
+Sanity-check locally first — the same validation the deploy gate runs:
+
+```bash
+pnpm vercel:check
+```
+
+## SECTION 4 — Deploy
+
+1. In the Vercel import screen (Section 2) press **Deploy** — or, for an
+   existing project, **Deployments → … → Redeploy**, or just push to `main`.
+2. First build takes ~2–4 minutes. The build runs
+   `pnpm db:generate && pnpm build` (Prisma client is gitignored and must be
+   regenerated on every build — handled automatically).
+3. If the build fails, the error is shown inline — see Section 6.
+
+Local alternative with the same guarantees (validates env + build first,
+explains failures):
+
+```bash
+pnpm deploy:check      # environment + lint/typecheck/format/build
+pnpm deploy:preview    # creates a preview deployment
+pnpm deploy:vercel     # production deployment (full gate first)
+```
+
+## SECTION 5 — Validate Deployment
+
+1. **Liveness** — open `https://<your-app>.vercel.app/api/health`:
+
+   ```json
+   { "status": "ok", "version": "0.1.0", "environment": "production" }
+   ```
+
+2. **Database** — sign in at `/sign-in` (needs seeded demo users on the DB:
+   `pnpm db:seed` from desktop). If login works, Better Auth ↔ Neon are wired.
+3. **PWA** — on Android Chrome: install prompt appears, home-screen icon is
+   the FlowPilot mark, offline page shows in airplane mode.
+4. **RTL/Arabic** — pages render `dir="rtl"`, Arabic copy, IBM Plex Sans Arabic.
+5. **Redeploy loop** — make a change → `pnpm verify` → commit → push →
+   Vercel rebuilds → `/api/health` shows the new version after you bump
+   `version` in `package.json`.
+
+## SECTION 6 — Troubleshooting
+
+| Symptom                                                             | Fix                                                                                                                                                                                       |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build fails: `Invalid server environment variables` (Arabic output) | One of the 4 env vars is missing/invalid **in Vercel project settings**. Add it (Section 3), then Redeploy. Verify locally with `pnpm vercel:check`.                                      |
+| Build fails: cannot find `@/generated/prisma/client`                | Should not happen (postinstall + buildCommand both generate). If you overrode the build command, ensure it runs `prisma generate` before `next build`.                                    |
+| Build succeeds, every page errors at runtime (`P1001` / connection) | `DATABASE_URL` unreachable from Vercel: check Neon project is alive (idle-suspended — wake in console), the string ends with `?sslmode=require`, and Neon's network access allows Vercel. |
+| Login/redirect loops or 403 on auth routes                          | `BETTER_AUTH_URL` ≠ actual domain. Set it to the exact production URL (https, no trailing slash) and redeploy.                                                                            |
+| Auth works on production but not on `*.vercel.app` preview URLs     | Expected — previews aren't in `trustedOrigins`. Test auth on the production domain.                                                                                                       |
+| `/api/health` returns old version after a release                   | Bump `version` in `package.json` (health reports it verbatim) and redeploy.                                                                                                               |
+| Installed PWA shows old UI after a deploy                           | The service worker updates on next visit (network-first navigations). Hard-refresh once or bump `VERSION` in `public/sw.js`.                                                              |
+| First request after idle is slow (~1s)                              | Neon cold start — normal on free plans. Acceptable at pilot scale.                                                                                                                        |
+| `pnpm deploy:*` says "not linked to a Vercel project"               | Run `vercel link` (or `pnpm dlx vercel@latest link`) once, or use the GitHub-connected flow (Section 2).                                                                                  |
+| Deploy gate aborts at environment validation                        | `pnpm vercel:check` output lists each variable, its problem, and the exact fix — fix locally in `.env.local` or in Vercel settings.                                                       |
+
+Still stuck? `docs/TROUBLESHOOTING.md` (local issues) and the Vercel
+deployment log (Builds → failed deployment → inspect) cover the rest.

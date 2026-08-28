@@ -18,6 +18,7 @@ export default async function HomePage() {
   return (
     <Dashboard
       businessName={business.name}
+      whatsappNumber={business.whatsappNumber}
       timeZone={business.timezone}
       data={data}
     />

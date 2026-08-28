@@ -1,12 +1,25 @@
 /**
- * FlowPilot seed — realistic Arabic demo data (dental-vertical demo
+ * FlowPilot seed — Arabic demo dataset (Egyptian dental-clinic demo business
  * only for local discovery; the product itself stays vertical-agnostic).
  *
  * Run with: pnpm db:seed
  * Requires a reachable DATABASE_URL. Idempotent: wipes demo rows first.
+ * All content lives in prisma/demo-data.ts (pure, deterministic, testable).
  */
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import {
+  BUSINESS_TIMEZONE,
+  DEMO_IDS,
+  dateIn,
+  demoAppointments,
+  demoBusiness,
+  demoConversations,
+  demoCustomers,
+  demoServices,
+  demoTeam,
+  stableId,
+} from "./demo-data";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 
@@ -25,139 +38,91 @@ function makeDb(): PrismaClient {
 
 const prisma = makeDb();
 
-const BUSINESS_TIMEZONE = "Asia/Riyadh";
-
-/** "YYYY-MM-DD" from today + offset days, in the business timezone. */
-function dateIn(days: number): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: BUSINESS_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const [year, month, day] = parts.split("-").map(Number);
-  const target = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
-  target.setUTCDate(target.getUTCDate() + days);
-  return target.toISOString().slice(0, 10);
-}
-
 async function main() {
   console.log("🌱 بدء تعبئة البيانات التجريبية…");
 
   // ── Wipe previous demo data (idempotent re-runs, demo business only) ──
   await prisma.message.deleteMany({
-    where: { conversation: { businessId: DEMO_BUSINESS_ID } },
+    where: { conversation: { businessId: DEMO_IDS.business } },
   });
   await prisma.conversation.deleteMany({
-    where: { businessId: DEMO_BUSINESS_ID },
+    where: { businessId: DEMO_IDS.business },
   });
   await prisma.appointment.deleteMany({
-    where: { businessId: DEMO_BUSINESS_ID },
+    where: { businessId: DEMO_IDS.business },
   });
   await prisma.customer.deleteMany({
-    where: { businessId: DEMO_BUSINESS_ID },
+    where: { businessId: DEMO_IDS.business },
   });
   await prisma.service.deleteMany({
-    where: { businessId: DEMO_BUSINESS_ID },
+    where: { businessId: DEMO_IDS.business },
   });
 
-  // ── Business: عيادة الابتسامة ──
-  const faqs = [
-    {
-      question: "كم سعر كشف الأسنان؟",
-      answer:
-        "سعر الكشف 150 ريالاً ويتضمن فحصاً شاملاً للأسنان واللثة مع خطة علاج أولية.",
-    },
-    {
-      question: "هل تقبلون التأمين الطبي؟",
-      answer:
-        "نعم، نتعامل مع أغلب شركات التأمين. أرسل صورة البطاقة قبل موعدك للتأكد من التغطية.",
-    },
-    {
-      question: "كيف ألغي أو أعدّل موعدي؟",
-      answer:
-        "راسلنا عبر واتساب قبل 24 ساعة على الأقل من الموعد لإلغائه أو تعديله مجاناً.",
-    },
-  ];
-
+  // ── Business: عيادة الابتسامة (كفر الشيخ) ──
   const business = await prisma.business.upsert({
-    where: { id: DEMO_BUSINESS_ID },
+    where: { id: DEMO_IDS.business },
     update: {
-      faqs,
-      slotDurationMinutes: 30,
+      name: demoBusiness.name,
+      city: demoBusiness.city,
+      whatsappNumber: demoBusiness.whatsappNumber,
+      timezone: BUSINESS_TIMEZONE,
+      about: demoBusiness.about,
+      cancellationPolicy: demoBusiness.cancellationPolicy,
+      workingHours: demoBusiness.workingHours,
+      slotDurationMinutes: demoBusiness.slotDurationMinutes,
+      faqs: demoBusiness.faqs,
       onboardingCompletedAt: new Date(),
       isActive: true,
     },
     create: {
-      id: DEMO_BUSINESS_ID,
-      name: "عيادة الابتسامة",
-      city: "الرياض",
-      whatsappNumber: "+966500000000",
-      timezone: "Asia/Riyadh",
-      about:
-        "عيادة متخصصة في طب الأسنان التجميلي والعلاجي، نستقبل مواعيدكم عبر واتساب على مدار الأسبوع.",
-      cancellationPolicy:
-        "يُرجى إلغاء الموعد قبل 24 ساعة على الأقل، وإلا قد تُطبق رسوم إلغاء.",
-      workingHours: {
-        sun: { open: "09:00", close: "21:00", closed: false },
-        mon: { open: "09:00", close: "21:00", closed: false },
-        tue: { open: "09:00", close: "21:00", closed: false },
-        wed: { open: "09:00", close: "21:00", closed: false },
-        thu: { open: "09:00", close: "22:00", closed: false },
-        fri: { open: "16:00", close: "22:00", closed: false },
-        sat: { open: "09:00", close: "21:00", closed: true },
+      id: DEMO_IDS.business,
+      name: demoBusiness.name,
+      city: demoBusiness.city,
+      whatsappNumber: demoBusiness.whatsappNumber,
+      timezone: BUSINESS_TIMEZONE,
+      about: demoBusiness.about,
+      cancellationPolicy: demoBusiness.cancellationPolicy,
+      workingHours: demoBusiness.workingHours,
+      slotDurationMinutes: demoBusiness.slotDurationMinutes,
+      faqs: demoBusiness.faqs,
+      onboardingCompletedAt: new Date(),
+      isActive: true,
+    },
+  });
+  console.log("✔ المنشأة:", business.name, `(${demoBusiness.city})`);
+
+  // ── Team: ADMIN + STAFF demo users (with login credentials) ──
+  const users = new Map<"admin" | "staff", string>();
+
+  const userId = (key: "admin" | "staff" | null): string | undefined => {
+    if (!key) return undefined;
+    const id = users.get(key);
+    if (!id) throw new Error(`حساب الفريق مفقود: ${key}`);
+    return id;
+  };
+
+  for (const member of demoTeam) {
+    const user = await prisma.user.upsert({
+      where: { email: member.email },
+      update: {
+        name: member.name,
+        role: member.role,
+        businessId: business.id,
+        isActive: true,
       },
-      slotDurationMinutes: 30,
-      faqs,
-      onboardingCompletedAt: new Date(),
-      isActive: true,
-    },
-  });
-  console.log("✔ المنشأة:", business.name);
+      create: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+        emailVerified: true,
+        image: null,
+        role: member.role,
+        businessId: business.id,
+        isActive: true,
+      },
+    });
 
-  // ── Staff: ADMIN + STAFF demo users (with login credentials) ──
-  const adminEmail = "admin@flowpilot.app";
-  const staffEmail = "staff@flowpilot.app";
-  const DEMO_PASSWORDS = {
-    admin: "Admin@1234",
-    staff: "Staff@1234",
-  } as const;
-
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: "ADMIN", businessId: business.id, isActive: true },
-    create: {
-      id: DEMO_ADMIN_ID,
-      name: "د. سارة العتيبي",
-      email: adminEmail,
-      emailVerified: true,
-      image: null,
-      role: "ADMIN",
-      businessId: business.id,
-      isActive: true,
-    },
-  });
-
-  const staff = await prisma.user.upsert({
-    where: { email: staffEmail },
-    update: { role: "STAFF", businessId: business.id, isActive: true },
-    create: {
-      id: DEMO_STAFF_ID,
-      name: "نورة القحطاني",
-      email: staffEmail,
-      emailVerified: true,
-      image: null,
-      role: "STAFF",
-      businessId: business.id,
-      isActive: true,
-    },
-  });
-
-  // Better Auth credential accounts — lets demo users sign in immediately.
-  for (const [user, password] of [
-    [admin, DEMO_PASSWORDS.admin],
-    [staff, DEMO_PASSWORDS.staff],
-  ] as const) {
+    // Better Auth credential account — lets the demo user sign in immediately.
     const existing = await prisma.account.findFirst({
       where: { userId: user.id, providerId: "credential" },
     });
@@ -168,50 +133,27 @@ async function main() {
           userId: user.id,
           accountId: user.id,
           providerId: "credential",
-          password: await hashPassword(password),
+          password: await hashPassword(member.password),
         },
       });
     }
+
+    users.set(member.key, user.id);
   }
 
-  console.log("✔ الفريق:", admin.name, "و", staff.name);
-  console.log("  دخول تجريبي:", `${adminEmail} / ${DEMO_PASSWORDS.admin}`);
-  console.log(`  دخول تجريبي: ${staffEmail} / ${DEMO_PASSWORDS.staff}`);
+  console.log(
+    "✔ الفريق:",
+    demoTeam.map((member) => member.name).join(" و"),
+    `— دخول تجريبي: ${demoTeam[0]!.email} / ${demoTeam[0]!.password} · ${demoTeam[1]!.email} / ${demoTeam[1]!.password}`,
+  );
 
   // ── Services ──
-  const servicesData = [
-    {
-      key: "checkup",
-      name: "كشف",
-      description: "فحص شامل للأسنان واللثة وتقييم الحالة العامة.",
-      durationMinutes: 30,
-    },
-    {
-      key: "cleaning",
-      name: "تنظيف أسنان",
-      description: "إزالة الجير والتلميع مع نصائح للعناية اليومية.",
-      durationMinutes: 45,
-    },
-    {
-      key: "filling",
-      name: "حشو",
-      description: "علاج التسوس بحشوات تجميلية بلون الأسنان الطبيعي.",
-      durationMinutes: 60,
-    },
-    {
-      key: "consultation",
-      name: "استشارة",
-      description: "جلسة استشارية لمناقشة خطة العلاج والخيارات المتاحة.",
-      durationMinutes: 20,
-    },
-  ] as const;
+  const serviceIds: Record<string, string> = {};
 
-  const services: Record<(typeof servicesData)[number]["key"], string> =
-    {} as never;
-
-  for (const service of servicesData) {
+  for (const service of demoServices) {
     const created = await prisma.service.create({
       data: {
+        id: stableId("service", service.key),
         businessId: business.id,
         name: service.name,
         description: service.description,
@@ -219,206 +161,50 @@ async function main() {
         isActive: true,
       },
     });
-    services[service.key] = created.id;
+    serviceIds[service.key] = created.id;
   }
-  console.log("✔ الخدمات:", servicesData.map((s) => s.name).join("، "));
+  console.log(
+    `✔ الخدمات: ${demoServices.length} (${demoServices.map((s) => s.name).join("، ")})`,
+  );
 
   // ── Customers ──
-  const customersData = [
-    {
-      key: "khaled",
-      name: "خالد الشمري",
-      phone: "+966551110001",
-      notes: "يفضل المواعيد المسائية بعد العمل.",
-    },
-    {
-      key: "amal",
-      name: "أمل الدوسري",
-      phone: "+966551110002",
-      notes: "حساسية عالية من البرد — استخدم مطهرًا لطيفًا.",
-    },
-    {
-      key: "faisal",
-      name: "فيصل المطيري",
-      phone: "+966551110003",
-      notes: null,
-    },
-    {
-      key: "reem",
-      name: "ريم الحربي",
-      phone: "+966551110004",
-      notes: "متابعة تقويم كل شهرين.",
-    },
-    {
-      key: "omar",
-      name: "عمر الزهراني",
-      phone: "+966551110005",
-      notes: null,
-    },
-  ] as const;
+  const customerIds: string[] = [];
 
-  const customers: Record<(typeof customersData)[number]["key"], string> =
-    {} as never;
-
-  for (const customer of customersData) {
-    const created = await prisma.customer.create({
+  for (const customer of demoCustomers) {
+    await prisma.customer.create({
       data: {
+        id: customer.id,
         businessId: business.id,
         name: customer.name,
         phone: customer.phone,
         notes: customer.notes ?? undefined,
       },
     });
-    customers[customer.key] = created.id;
+    customerIds.push(customer.id);
   }
-  console.log("✔ العملاء:", customersData.map((c) => c.name).join("، "));
+  console.log(`✔ العملاء: ${demoCustomers.length} عميل بأرقام مصرية`);
 
-  // ── Conversations + messages (real Arabic WhatsApp flow) ──
-  type ConversationSeed = {
-    customerId: string;
-    status: "AI_ACTIVE" | "NEED_HUMAN" | "BOOKED" | "INCOMPLETE";
-    aiSummary?: string;
-    assignedUserId?: string;
-    messages: Array<{
-      senderType: "CUSTOMER" | "AI" | "STAFF";
-      content: string;
-      minutesAgo: number;
-    }>;
-  };
+  // ── Conversations + messages (real Egyptian-Arabic WhatsApp flow) ──
+  for (const conversation of demoConversations) {
+    const customerId = customerIds[conversation.customerIndex];
+    if (!customerId) {
+      throw new Error(
+        `customerIndex خارج النطاق: ${conversation.customerIndex}`,
+      );
+    }
 
-  const conversationsData: ConversationSeed[] = [
-    {
-      customerId: customers.khaled,
-      status: "BOOKED",
-      aiSummary: "عميل يطلب تنظيف أسنان، تم تأكيد الموعد مساء الخميس.",
-      messages: [
-        {
-          senderType: "CUSTOMER",
-          content: "السلام عليكم، أبي أحجز موعد لتنظيف الأسنان",
-          minutesAgo: 240,
-        },
-        {
-          senderType: "AI",
-          content:
-            "وعليكم السلام خالد 👋 أهلاً بك في عيادة الابتسامة! بالتأكيد، ما يناسبك أكثر: الصباح من 9 إلى 12 أم المساء من 6 إلى 9؟",
-          minutesAgo: 238,
-        },
-        {
-          senderType: "CUSTOMER",
-          content: "المساء أفضل لي",
-          minutesAgo: 236,
-        },
-        {
-          senderType: "AI",
-          content:
-            "ممتاز! متاح بعد يومين الساعة 7:30 مساءً مع د. سارة. هل أكد لك الموعد؟",
-          minutesAgo: 235,
-        },
-        {
-          senderType: "CUSTOMER",
-          content: "أكد، شكراً جزيلاً 🌹",
-          minutesAgo: 233,
-        },
-        {
-          senderType: "AI",
-          content:
-            "تم تأكيد حجزك ✅ يوم الخميس 7:30 مساءً — تنظيف أسنان. بانتظارك!",
-          minutesAgo: 232,
-        },
-      ],
-    },
-    {
-      customerId: customers.amal,
-      status: "NEED_HUMAN",
-      assignedUserId: staff.id,
-      aiSummary: "عميلة تسأل عن ألم حاد في الضرس، تحتاج تدخلاً بشرياً عاجلاً.",
-      messages: [
-        {
-          senderType: "CUSTOMER",
-          content: "مرحباً، عندي ألم حاد في ضرس الفك اليسرى 😖",
-          minutesAgo: 90,
-        },
-        {
-          senderType: "AI",
-          content:
-            "نعتذر عن ما تشعرين به يا أمل. الألم الحاد يحتاج تقييماً من الطبيب مباشرة، سأحولك الآن لأحد فريقنا لمساعدتك بأسرع وقت.",
-          minutesAgo: 89,
-        },
-        {
-          senderType: "STAFF",
-          content:
-            "هلا أمل، أنا نورة من عيادة الابتسامة. عندنا فراغ اليوم الساعة 8 مساءً لكشف عاجل. يناسبك؟",
-          minutesAgo: 45,
-        },
-      ],
-    },
-    {
-      customerId: customers.faisal,
-      status: "AI_ACTIVE",
-      messages: [
-        {
-          senderType: "CUSTOMER",
-          content: "كم سعر الحشو؟",
-          minutesAgo: 20,
-        },
-        {
-          senderType: "AI",
-          content:
-            "أهلاً فيصل! سعر الحشو التجميلي يبدأ من 250 ريال حسب حالة الضرس. تحب أحدد لك موعد كشف أولاً؟",
-          minutesAgo: 19,
-        },
-      ],
-    },
-    {
-      customerId: customers.reem,
-      status: "INCOMPLETE",
-      messages: [
-        {
-          senderType: "AI",
-          content: "مساء الخير ريم 🌸 حان وقت موعد متابعة التقويم الشهري!",
-          minutesAgo: 1440,
-        },
-        {
-          senderType: "CUSTOMER",
-          content: "سأرد عليكم لاحقاً لأحدد اليوم المناسب",
-          minutesAgo: 1400,
-        },
-      ],
-    },
-    {
-      customerId: customers.omar,
-      status: "NEED_HUMAN",
-      aiSummary:
-        "عميل يطلب نقل موعده المؤكد اليوم إلى الغد — بانتظار تأكيد الفريق.",
-      messages: [
-        {
-          senderType: "CUSTOMER",
-          content:
-            "السلام عليكم، طارئ شغل بسيط. ممكن أحول موعدي اليوم الساعة 5 إلى بكرة نفس الوقت؟",
-          minutesAgo: 18,
-        },
-        {
-          senderType: "AI",
-          content:
-            "وعليكم السلام عمر 👋 بالتأكيد نقدر نرتبها. سأحوّلك الآن لعضو الفريق لتثبيت الموعد الجديد.",
-          minutesAgo: 17,
-        },
-      ],
-    },
-  ];
-
-  for (const conversation of conversationsData) {
-    const lastMessageAt = new Date(
-      Date.now() -
-        conversation.messages[conversation.messages.length - 1]!.minutesAgo *
-          60_000,
-    );
+    const lastMessage =
+      conversation.messages[conversation.messages.length - 1] ?? null;
+    const lastMessageAt = lastMessage
+      ? new Date(Date.now() - lastMessage.minutesAgo * 60_000)
+      : new Date();
 
     const created = await prisma.conversation.create({
       data: {
+        id: conversation.id,
         businessId: business.id,
-        customerId: conversation.customerId,
-        assignedUserId: conversation.assignedUserId ?? undefined,
+        customerId,
+        assignedUserId: userId(conversation.assignee),
         status: conversation.status,
         aiSummary: conversation.aiSummary ?? undefined,
         lastMessageAt,
@@ -435,110 +221,40 @@ async function main() {
     });
 
     await prisma.customer.update({
-      where: { id: conversation.customerId },
+      where: { id: customerId },
       data: { lastConversationAt: lastMessageAt },
     });
   }
-  console.log(`✔ المحادثات: ${conversationsData.length} محادثات برسائلها`);
+  console.log(
+    `✔ المحادثات: ${demoConversations.length} محادثة (${demoConversations.reduce((total, conversation) => total + conversation.messages.length, 0)} رسالة)`,
+  );
 
-  // ── Appointments (mixed statuses) ──
-  const appointmentsData: Array<{
-    customerId: string;
-    serviceKey: keyof typeof services;
-    assignedUserId?: string;
-    dayOffset: number;
-    start: string;
-    end: string;
-    status: "PENDING" | "CONFIRMED" | "CANCELLED" | "NO_SHOW" | "COMPLETED";
-    notes?: string;
-  }> = [
-    // Today — a lively agenda right after login.
-    {
-      customerId: customers.reem,
-      serviceKey: "cleaning",
-      assignedUserId: staff.id,
-      dayOffset: 0,
-      start: "10:00",
-      end: "10:45",
-      status: "CONFIRMED",
-      notes: "تنظيف دوري — أكدت الموعد عبر واتساب.",
-    },
-    {
-      customerId: customers.omar,
-      serviceKey: "checkup",
-      assignedUserId: admin.id,
-      dayOffset: 0,
-      start: "17:00",
-      end: "17:30",
-      status: "CONFIRMED",
-    },
-    {
-      customerId: customers.amal,
-      serviceKey: "checkup",
-      assignedUserId: staff.id,
-      dayOffset: 0,
-      start: "20:00",
-      end: "20:30",
-      status: "PENDING",
-      notes: "كشف عاجل بسبب ألم في الضرس.",
-    },
-    // Upcoming.
-    {
-      customerId: customers.khaled,
-      serviceKey: "cleaning",
-      dayOffset: 2,
-      start: "19:30",
-      end: "20:15",
-      status: "CONFIRMED",
-      notes: "حجز مؤكد عبر واتساب.",
-    },
-    {
-      customerId: customers.faisal,
-      serviceKey: "filling",
-      assignedUserId: admin.id,
-      dayOffset: 4,
-      start: "10:00",
-      end: "11:00",
-      status: "PENDING",
-    },
-    // History.
-    {
-      customerId: customers.reem,
-      serviceKey: "consultation",
-      dayOffset: -7,
-      start: "17:00",
-      end: "17:20",
-      status: "COMPLETED",
-      notes: "متابعة تقويم دورية.",
-    },
-    {
-      customerId: customers.omar,
-      serviceKey: "cleaning",
-      dayOffset: -14,
-      start: "11:00",
-      end: "11:45",
-      status: "NO_SHOW",
-      notes: "لم يحضر ولم يجب على المكالمات.",
-    },
-    {
-      customerId: customers.omar,
-      serviceKey: "checkup",
-      dayOffset: -3,
-      start: "12:00",
-      end: "12:30",
-      status: "CANCELLED",
-      notes: "ألغى الموعد بسبب ظرف طارئ.",
-    },
-  ];
+  // ── Appointments (all statuses, past/today/upcoming) ──
+  const now = new Date();
+  const statusCount: Record<string, number> = {};
 
-  for (const appointment of appointmentsData) {
+  for (const appointment of demoAppointments) {
+    const customerId = customerIds[appointment.customerIndex];
+    const serviceId = serviceIds[appointment.serviceKey];
+    if (!customerId || !serviceId) {
+      throw new Error(
+        `مرجع غير صالح في المواعيد: عميل ${appointment.customerIndex} / خدمة ${appointment.serviceKey}`,
+      );
+    }
+
+    const date = dateIn(now, appointment.dayOffset);
+
     await prisma.appointment.create({
       data: {
+        id: stableId(
+          "appointment",
+          `${appointment.dayOffset}-${appointment.start}-${appointment.customerIndex}`,
+        ),
         businessId: business.id,
-        customerId: appointment.customerId,
-        serviceId: services[appointment.serviceKey],
-        assignedUserId: appointment.assignedUserId ?? undefined,
-        date: new Date(`${dateIn(appointment.dayOffset)}T00:00:00.000Z`),
+        customerId,
+        serviceId,
+        assignedUserId: userId(appointment.assignee),
+        date: new Date(`${date}T00:00:00.000Z`),
         startTime: new Date(`1970-01-01T${appointment.start}:00.000Z`),
         endTime: new Date(`1970-01-01T${appointment.end}:00.000Z`),
         status: appointment.status,
@@ -546,26 +262,24 @@ async function main() {
       },
     });
 
+    statusCount[appointment.status] =
+      (statusCount[appointment.status] ?? 0) + 1;
+
     if (appointment.dayOffset < 0) {
       await prisma.customer.update({
-        where: { id: appointment.customerId },
-        data: {
-          lastAppointmentAt: new Date(
-            `${dateIn(appointment.dayOffset)}T00:00:00.000Z`,
-          ),
-        },
+        where: { id: customerId },
+        data: { lastAppointmentAt: new Date(`${date}T00:00:00.000Z`) },
       });
     }
   }
-  console.log(`✔ المواعيد: ${appointmentsData.length} بمختلف الحالات`);
+  console.log(
+    `✔ المواعيد: ${demoAppointments.length} (${Object.entries(statusCount)
+      .map(([status, count]) => `${count} ${status}`)
+      .join(" · ")})`,
+  );
 
-  console.log("✅ تمت تعبئة البيانات التجريبية بنجاح.");
+  console.log("✅ تمت تعبئة البيانات التجريبية بنجاح — البيانات للتجربة فقط.");
 }
-
-// Demo IDs — stable so re-running the seed is predictable.
-const DEMO_BUSINESS_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
-const DEMO_ADMIN_ID = "9b2f1c3e-7a44-4c8e-9d21-6f5a8b0c2d10";
-const DEMO_STAFF_ID = "4d8a2e61-93b7-4f0c-a5d3-1c7e9b2f8a40";
 
 main()
   .catch((error) => {

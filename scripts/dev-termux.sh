@@ -49,9 +49,11 @@ get_env_var() { # get_env_var KEY — .env.local wins over .env
 
 # ── 4. Schema sync (best effort — schema engine unsupported on-device) ───────
 DB_URL="$(get_env_var DATABASE_URL)"
+DB_READY=true
 if [ -z "$DB_URL" ] \
   || printf '%s' "$DB_URL" | grep -qi "user:password@" \
   || printf '%s' "$DB_URL" | grep -qi "replace-with"; then
+  DB_READY=false
   warn "DATABASE_URL not configured — skipping prisma db push (set it in .env.local)"
 else
   log "Attempting schema sync (prisma db push)…"
@@ -61,6 +63,18 @@ else
   fi
 fi
 
-# ── 5. Dev server (Webpack on Termux) ────────────────────────────────────────
+# ── 5. Demo data (DEMO_MODE=true — best effort, never blocks) ────────────────
+if [ "$(get_env_var DEMO_MODE)" = "true" ]; then
+  if [ "$DB_READY" = true ]; then
+    log "DEMO_MODE=true — seeding Arabic demo data…"
+    if ! pnpm db:seed; then
+      warn "db:seed failed — continuing to the dev server."
+    fi
+  else
+    warn "DEMO_MODE=true but DATABASE_URL not ready — skipping demo seed."
+  fi
+fi
+
+# ── 6. Dev server (Webpack on Termux) ────────────────────────────────────────
 log "Starting Next.js dev server (Webpack — Termux)…"
 exec pnpm exec next dev --webpack

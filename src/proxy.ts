@@ -21,7 +21,12 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/api/auth");
+  // /api/health is the public liveness probe (deployment validation).
+  return (
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/auth")
+  );
 }
 
 export function proxy(request: NextRequest) {

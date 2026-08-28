@@ -1,3 +1,4 @@
+import { GettingStarted } from "@/features/dashboard/components/getting-started";
 import { QuickActions } from "@/features/dashboard/components/quick-actions";
 import { RecentConversations } from "@/features/dashboard/components/recent-conversations";
 import { TodayAgenda } from "@/features/dashboard/components/today-agenda";
@@ -14,19 +15,30 @@ import {
 
 export function Dashboard({
   businessName,
+  whatsappNumber,
   timeZone,
   data,
 }: {
   businessName: string;
+  whatsappNumber: string;
   timeZone: string;
   data: Awaited<ReturnType<typeof getDashboardData>>;
 }) {
+  // Zero activity anywhere → onboarding guidance instead of a dead dashboard.
+  const isEmpty =
+    data.conversations.recent.length === 0 &&
+    data.appointments.agenda.length === 0 &&
+    data.appointments.pendingCount === 0 &&
+    data.appointments.confirmedCount === 0;
+
   return (
     <div className="animate-fade-in-up space-y-8">
       <PageHeader
         title={`اليوم في ${businessName}`}
         description="ابدأ بما يحتاج تدخلك، ثم راجع جدول المواعيد."
       />
+
+      {isEmpty ? <GettingStarted whatsappNumber={whatsappNumber} /> : null}
 
       <section aria-labelledby="today-summary-heading" className="space-y-3">
         <h2 id="today-summary-heading" className="sr-only">

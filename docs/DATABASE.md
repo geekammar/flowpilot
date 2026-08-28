@@ -84,7 +84,10 @@ Highlights:
 
 ## Seeding
 
-Realistic Arabic demo data (demo business عيادة الابتسامة):
+Realistic Arabic demo data — Egyptian dental clinic **عيادة الابتسامة**
+(كفر الشيخ, Africa/Cairo, WhatsApp +20). Dataset lives in
+`prisma/demo-data.ts` (pure, deterministic, no DB imports) and is consumed by
+`prisma/seed.ts`:
 
 ```bash
 pnpm db:migrate   # create/apply schema
@@ -92,13 +95,24 @@ pnpm db:seed      # tsx prisma/seed.ts
 pnpm db:studio    # inspect
 ```
 
-Seeds: business + working hours + FAQs + onboarding completion, admin
-(د. سارة العتيبي) + staff (نورة القحطاني) users **with Better Auth
-credential accounts** (demo login: `admin@flowpilot.app` /
-`Admin@1234`, `staff@flowpilot.app` / `Staff@1234` — demo databases
-only), 4 services (كشف، تنظيف أسنان، حشو، استشارة), 5 customers, 5
-conversations with real Arabic messages covering all statuses (incl. an
-unassigned `NEED_HUMAN` reschedule request), and 8 appointments across
-all statuses — 3 of them today (2 confirmed + 1 pending) so the
-dashboard looks alive right after login. Re-running is idempotent and
-only wipes rows of the demo business.
+Seeds:
+
+- Business: working hours (الجمعة مساءً فقط), 5 FAQs (أسعار/تأمين/أطفال/
+  عنوان/تقسيط), cancellation policy, completed onboarding
+- Team with Better Auth credential accounts — demo login:
+  `admin@flowpilot.app` / `Admin@1234` (د. سارة محمود الشريف) and
+  `staff@flowpilot.app` / `Staff@1234` (نورهان السيد) — demo DBs only
+- 6 services (كشف · تنظيف · حشو · علاج عصب · تبييض · تاج زيركون)
+- 36 customers — Egyptian names, deterministic `+20 (10|11|12|15)` phones
+- 22 conversations (73 messages) in Egyptian colloquial Arabic covering all
+  statuses: bookings confirmed end-to-end, reschedule + emergency + complaint
+  handoffs (`NEED_HUMAN`), FAQ answers (`AI_ACTIVE`), dropped-off threads
+  (`INCOMPLETE`)
+- 37 appointments across the last ~2 weeks and next week: 14 completed ·
+  11 confirmed · 9 pending · 2 cancelled · 1 no-show — 4 today (3 confirmed +
+  1 pending) so the dashboard looks alive right after login
+
+Re-running is idempotent and only wipes rows of the demo business (scoped by
+business ID). All IDs, phones, and offsets are deterministic, so every seed
+run produces the same demo state. Demo walkthrough: `DEMO_GUIDE.md`;
+auto-seed via `DEMO_MODE=true` in dev launchers: `ENVIRONMENT_VARIABLES.md`.

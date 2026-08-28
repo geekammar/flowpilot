@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: Ops 03.
+> Last updated: Ops 05.
 
 ## Prompt 01 — Repository Foundation
 
@@ -572,6 +572,168 @@ CURRENT_STATE,RELEASE_REPORT}.md`; updated `package.json` (release script),
 
 ---
 
+## Ops 04 — Vercel Deployment Readiness (DX Only)
+
+**Status:** ✅ Complete (publishing blocked on user actions — by design)
+
+> Operator-requested deployment pass: audit, Vercel compatibility fixes,
+> environment validation, health endpoint, gated deploy commands, config, and
+> deployment documentation. No product work, no architecture/schema changes,
+> no new dependencies.
+
+### Completed Work
+
+- **Deployment audit**: `docs/VERCEL_AUDIT.md` — per-area findings (Next,
+  Prisma, Postgres, Better Auth, PWA, build, env), 2 blockers, 6 risks,
+  readiness score 4.5/10 → 8.5/10 after this pass. Root-caused why the
+  operator's earlier `prisma generate && next build` fix (commit `299eb08`,
+  reverted `d472717`) could not unblock deploys alone: all four env vars are
+  required at **build time** (fail-fast `env.ts` runs during prerender), so
+  missing Vercel env settings fail the build regardless.
+- **Vercel compatibility fixes**: `postinstall: prisma generate` (standard
+  Prisma pattern; works on all platforms incl. Termux) + minimal `vercel.json`
+  with explicit `buildCommand: pnpm db:generate && pnpm build` (defense in
+  depth — the `build` script itself stays untouched per the revert) and
+  no-cache headers for `/sw.js` & `/offline.html`.
+- **Environment validation**: `scripts/vercel-check.mjs` (`pnpm vercel:check`)
+  — validates DATABASE_URL (postgres scheme, placeholder, sslmode warning),
+  BETTER_AUTH_SECRET (length/placeholders), BETTER_AUTH_URL and
+  NEXT_PUBLIC_APP_URL (http(s), localhost warnings), origin consistency;
+  same env precedence as the app; values never printed.
+- **Health endpoint**: `/api/health` (force-dynamic, dependency-free) →
+  `{"status":"ok","version":"0.1.0","environment":<NODE_ENV>}` with version
+  sourced from `package.json`. Found live (via `next start` + curl) that the
+  auth `proxy.ts` redirected it to `/sign-in`; added `/api/health` to the
+  public-path check so liveness probes work unauthenticated — verified 200
+  with the exact JSON on a production server.
+- **Deploy commands**: `scripts/deploy.mjs` — `pnpm deploy:check` (env gate →
+  full verify gate → readiness verdict), `pnpm deploy:preview` (env + build →
+  `vercel deploy`), `pnpm deploy:vercel` (env + full gate →
+  `vercel deploy --prod`); Vercel CLI auto-fallback via `pnpm dlx`; unlinked
+  project detected with instructions; every failure explains its fix.
+- **Documentation**: `docs/VERCEL_DEPLOYMENT.md` (6 sections: project →
+  GitHub → env vars → deploy → validate → troubleshooting, incl. no-GitHub
+  CLI path), `docs/ENVIRONMENT_VARIABLES.md` (reference for all 4 variables:
+  scope, validation layers, generation recipes, per-environment values),
+  `docs/DEPLOYMENT_REPORT.md` (automated report).
+
+### Generated Files
+
+`docs/{VERCEL_AUDIT,VERCEL_DEPLOYMENT,ENVIRONMENT_VARIABLES,DEPLOYMENT_REPORT}.md`,
+`scripts/{vercel-check,deploy}.mjs`, `src/app/api/health/route.ts`,
+`vercel.json`; updated `package.json` (postinstall + vercel:check +
+deploy:* scripts), `src/proxy.ts` (public `/api/health`), `README.md`
+(deploy commands), `docs/DECISIONS.md` (#19).
+
+### Verification
+
+- `node --check` on both new scripts ✅
+- `pnpm vercel:check` live: correctly FAILS on the device's placeholder
+  `DATABASE_URL` with per-variable fixes; PASSES with valid temporary values ✅
+- `pnpm deploy:check` live: aborts at env gate with clear guidance ✅
+- `pnpm verify` full gate: ✅ (lint/typecheck/format/build --webpack)
+- `next start` + `curl /api/health`: `{"status":"ok","version":"0.1.0",
+"environment":"production"}` ✅
+
+### Known Issues
+
+- Deploying still requires user actions (not code): set the 4 env vars in
+  Vercel project settings (Production + Preview), run `pnpm db:deploy`
+  against Neon from desktop, push the repo (`pnpm release`), import in Vercel.
+- Auth on `*.vercel.app` preview URLs is expected to misbehave
+  (`trustedOrigins` covers the production URL only) — test auth on the
+  production domain; documented in `VERCEL_DEPLOYMENT.md` Section 6.
+- `/api/health` reports the `package.json` version verbatim; bump it with
+  releases (already the convention in `RELEASE_PROCESS.md`).
+
+---
+
+## Ops 05 — Demo Readiness (Product Demo Pass)
+
+**Status:** ✅ Complete
+
+> Operator-requested demo pass: make FlowPilot impressive in demos,
+> understandable in 2 minutes, and realistic immediately after login. No new
+> product modules, no architecture changes, no schema changes — seed data,
+> one dashboard empty state, DEMO_MODE hook, and demo/sales documentation.
+
+### Completed Work
+
+- **Demo data strategy**: moved the full dataset out of `seed.ts` into
+  `prisma/demo-data.ts` — pure data + deterministic helpers (sha1-based
+  stable IDs, Egyptian phone generator, Cairo-aware date math), zero DB
+  imports, so the dataset is editable and offline-validatable.
+- **Egyptian demo business** (عيادة الابتسامة، كفر الشيخ): replaced the
+  Saudi-flavored context with the real target market — Africa/Cairo
+  timezone, +20 WhatsApp number, EGP prices in FAQs, Egyptian working hours
+  (الجمعة مساءً فقط), Egyptian team names (د. سارة محمود الشريف +
+  نورهان السيد) with the SAME demo credentials (DECISIONS #14 unchanged).
+- **Demo customers (36)**: Egyptian Arabic names with authentic family
+  names, deterministic `+20 (10|11|12|15)` phone numbers (verified unique
+  across 200 indexes), realistic notes on ~10 customers.
+- **Demo appointments (37)**: all 5 statuses (14 completed · 11 confirmed ·
+  9 pending · 2 cancelled · 1 no-show) spread across ±2 weeks, per-day
+  conflict-free times, 4 today (3 confirmed + 1 pending) — appointments
+  mirror the BOOKED conversations for narrative consistency (e.g. عمر's
+  cancelled → urgent-today arc).
+- **Demo conversations (22, 73 messages)**: Egyptian-colloquial WhatsApp
+  Arabic covering booking requests, rescheduling, emergencies, price/hours/
+  insurance/location questions, confirmations, a complaint handled with
+  compensation, and dropped-off threads — all 4 statuses (6 BOOKED ·
+  5 NEED_HUMAN incl. 2 unassigned · 7 AI_ACTIVE · 4 INCOMPLETE), fresh
+  activity today (~11 conversations) so the dashboard is alive immediately
+  after login.
+- **Dashboard empty states**: new `GettingStarted` onboarding card (3 steps:
+  share WhatsApp number with real number display, create first appointment,
+  follow conversations) shown ONLY at zero activity; vertical-agnostic copy;
+  existing per-list empty states kept.
+- **DEMO_MODE support**: `DEMO_MODE=true` (optional, off by default) makes
+  `scripts/dev.sh` / `dev.ps1` / `dev-termux.sh` re-seed demo data before
+  starting the dev server — best effort, never blocks, requires a real
+  DATABASE_URL, never used by production builds. Documented in
+  `.env.example` + `ENVIRONMENT_VARIABLES.md`.
+- **Documentation**: `docs/DEMO_GUIDE.md` (logins, demo business, sample
+  scenarios, 2-minute walkthrough, reset) and `docs/DEMO_SCRIPT.md`
+  (timed 5-minute sales flow with Arabic talk track, objection cheat sheet,
+  do/don't list). Updated `DATABASE.md` seeding section and README.
+
+### Generated Files
+
+`prisma/demo-data.ts`, `prisma/seed.ts` (rewritten as dataset consumer),
+`src/features/dashboard/components/getting-started.tsx`,
+`docs/{DEMO_GUIDE,DEMO_SCRIPT}.md`; updated `src/features/dashboard/
+components/dashboard.tsx` + `src/app/(app)/page.tsx` (whatsappNumber prop,
+isEmpty logic), `scripts/{dev.sh,dev-termux.sh,dev.ps1}` (DEMO_MODE step),
+`.env.example`, `docs/{DATABASE,ENVIRONMENT_VARIABLES,DECISIONS}.md`,
+`README.md`.
+
+### Verification
+
+- Offline dataset validation (25 checks via temporary tsx harness, then
+  removed): counts (36/22/37), phone format+uniqueness, name/ID uniqueness,
+  all statuses covered, message chronology, one-thread-per-customer,
+  customerIndex bounds, HH:mm validity, **no same-day appointment overlaps**,
+  determinism — ALL PASSED ✅ (caught one real gap: whitening missing from
+  appointments → added يارا's booking)
+- `bash -n` on both modified shell scripts ✅
+- `pnpm verify` full gate ✅ (lint/typecheck/format/build --webpack)
+- `pnpm security` ✅ (demo passwords are documented demo credentials, not
+  secrets — same as DECISIONS #14)
+
+### Known Issues
+
+- The seed run itself could not be executed on this device (placeholder
+  `DATABASE_URL`) — dataset verified offline + full typecheck; run
+  `pnpm db:seed` from desktop/CI before the first demo.
+- Conversations hold realistic static timestamps relative to seed time;
+  if seeded days before a demo, "today" stats shift — re-seed before demos
+  (`DEMO_MODE=true` automates this).
+- Customers directory screen is still a placeholder (Spec A pending) —
+  customer data is visible via conversation detail pages only; the demo
+  guide/scripts explicitly route around it.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -594,6 +756,19 @@ CURRENT_STATE,RELEASE_REPORT}.md`; updated `package.json` (release script),
   docs, status snapshot. **v0.1.0 prepared but NOT published** — blocked on
   `gh auth login` + real `DATABASE_URL`, then `pnpm release` finishes — see
   `docs/RELEASE_REPORT.md`.
+- **Ops 04 (Vercel deployment pass) complete:** audit + fixes (postinstall
+  Prisma generation, `vercel.json` build command + SW cache headers),
+  `pnpm vercel:check` env validation, `/api/health`, gated
+  `pnpm deploy:check/preview/vercel`, and full deployment docs — see
+  `docs/DEPLOYMENT_REPORT.md`. **Deployment Readiness: READY (code side)** —
+  remaining steps are user actions in Vercel/Neon consoles
+  (`docs/VERCEL_DEPLOYMENT.md`).
+- **Ops 05 (demo pass) complete:** Egyptian demo dataset (عيادة الابتسامة
+  بكفر الشيخ: 36 customers, 22 conversations, 37 appointments) in pure
+  `prisma/demo-data.ts`, dashboard `GettingStarted` empty state, `DEMO_MODE`
+  auto-seed hook in dev launchers, and `docs/DEMO_GUIDE.md` +
+  `docs/DEMO_SCRIPT.md`. **Demo Readiness: READY** — re-seed before each
+  demo (`pnpm db:seed` or `DEMO_MODE=true`).
 - **Next Step:** Prompt 09 — complete the Arabic Better Auth sign-up
   flow, then continue with the next requested Spec A operational screen
   (recommended order: Customers directory → Staff area → Services →

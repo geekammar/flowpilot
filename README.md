@@ -30,6 +30,9 @@ vertical. **The UI and domain model stay completely vertical-agnostic.**
 | Deploy    | Vercel                         |
 | Pkg mgr   | pnpm                           |
 
+Deployment: `docs/VERCEL_DEPLOYMENT.md` · Environment variables:
+`docs/ENVIRONMENT_VARIABLES.md` · Liveness probe: `/api/health`.
+
 ## Getting Started
 
 One-time bootstrap per platform (verifies node/pnpm/git/gh, installs only what
@@ -83,6 +86,10 @@ server, Prisma CLI, and seed script alike.
 | `pnpm verify`            | Full quality gate: lint + typecheck + format + build (Termux-aware)                    |
 | `pnpm security`          | Secret scan (env files, keys, tokens, credentials)                                     |
 | `pnpm release`           | Gated release: doctor+verify+security → commit → tag → GitHub repo/release             |
+| `pnpm vercel:check`      | Deployment environment validation (4 required variables, clear fixes)                  |
+| `pnpm deploy:check`      | Deployment readiness: env gate + full quality gate → verdict                           |
+| `pnpm deploy:preview`    | Env + build validation → Vercel preview deployment                                     |
+| `pnpm deploy:vercel`     | Env + full quality gate → Vercel production deployment                                 |
 | `pnpm run hooks:install` | Install the pre-commit safety hook                                                     |
 | `pnpm dev`               | Dev server (Turbopack; `--webpack` on Termux)                                          |
 | `pnpm build`             | Production build                                                                       |
@@ -96,7 +103,7 @@ server, Prisma CLI, and seed script alike.
 | `pnpm db:deploy`         | Apply migrations (prod/CI)                                                             |
 | `pnpm db:push`           | Push schema without migration                                                          |
 | `pnpm db:studio`         | Prisma Studio                                                                          |
-| `pnpm db:seed`           | Seed Arabic demo data                                                                  |
+| `pnpm db:seed`           | Seed the Arabic demo dataset (Egyptian dental clinic — see docs/DEMO_GUIDE.md)         |
 | `pnpm icons`             | Regenerate PWA PNG icons                                                               |
 
 > `setup` and `doctor` require `pnpm run …` — without `run` they collide with
@@ -163,6 +170,9 @@ src/
 
 ## Notes
 
+- Demo: realistic Arabic dataset with demo logins — `docs/DEMO_GUIDE.md`
+  (setup, scenarios) and `docs/DEMO_SCRIPT.md` (5-minute sales walkthrough).
+  Set `DEMO_MODE=true` in `.env.local` to auto-seed on dev launch.
 - Database layer (schema, validation, repositories, seed): see
   [docs/DATABASE.md](docs/DATABASE.md).
 - This project uses the current Next.js release (16.x), which differs from

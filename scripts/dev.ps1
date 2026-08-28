@@ -46,8 +46,10 @@ if (-not (Test-Path ".env") -and -not (Test-Path ".env.local")) {
 
 # -- 4. Schema sync (best effort - never blocks the dev server) ---------------
 $dbUrl = Get-EnvVar "DATABASE_URL"
+$dbReady = $true
 $placeholder = -not $dbUrl -or $dbUrl -match "user:password@" -or $dbUrl -match "replace-with"
 if ($placeholder) {
+    $dbReady = $false
     Write-Warn2 "DATABASE_URL not configured - skipping prisma db push (set it in .env.local)"
 }
 else {
@@ -58,6 +60,21 @@ else {
     }
 }
 
-# -- 5. Dev server ------------------------------------------------------------
+# -- 5. Demo data (DEMO_MODE=true - best effort, never blocks) ----------------
+$demoMode = Get-EnvVar "DEMO_MODE"
+if ($demoMode -eq "true") {
+    if ($dbReady) {
+        Write-Step "DEMO_MODE=true - seeding Arabic demo data…"
+        pnpm db:seed
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn2 "db:seed failed - continuing to the dev server."
+        }
+    }
+    else {
+        Write-Warn2 "DEMO_MODE=true but DATABASE_URL not ready - skipping demo seed."
+    }
+}
+
+# -- 6. Dev server ------------------------------------------------------------
 Write-Step "Starting Next.js dev server (Turbopack)…"
 pnpm dev
