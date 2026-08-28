@@ -10,7 +10,7 @@
     "release": "bash scripts/release.sh",
     "hooks:install": "node scripts/install-git-hooks.mjs",
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
