@@ -1,0 +1,276 @@
+"use client";
+
+import { updateAppointmentStatus } from "@/features/appointments/actions/appointment-actions";
+import {
+  APPOINTMENT_STATUS_LABELS,
+  AppointmentStatusBadge,
+} from "@/features/appointments/components/appointment-status";
+import type { AppointmentAgendaItem } from "@/features/appointments/types";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { APPOINTMENT_NOUNS, arabicCount } from "@/lib/arabic";
+import type { AppointmentStatus } from "@/types/domain";
+
+import {
+  CalendarDaysIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Clock3Icon,
+  PlusIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+
+const FILTERS: Array<{ value: "ALL" | AppointmentStatus; label: string }> = [
+  { value: "ALL", label: "كل الحالات" },
+  { value: "PENDING", label: "قيد الانتظار" },
+  { value: "CONFIRMED", label: "مؤكد" },
+  { value: "CANCELLED", label: "ملغي" },
+  { value: "NO_SHOW", label: "لم يحضر" },
+  { value: "COMPLETED", label: "مكتمل" },
+];
+
+function moveDate(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("ar-EG", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function formatTime(time: string) {
+  return new Intl.DateTimeFormat("ar-EG", {
+    timeZone: "UTC",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(time));
+}
+
+export function AppointmentAgenda({
+  initialItems,
+  date,
+  today,
+}: {
+  initialItems: AppointmentAgendaItem[];
+  date: string;
+  today: string;
+}) {
+  const router = useRouter();
+  const [items, setItems] = useState(initialItems);
+  const [filter, setFilter] = useState<"ALL" | AppointmentStatus>("ALL");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const visible = useMemo(
+    () => items.filter((item) => filter === "ALL" || item.status === filter),
+    [filter, items],
+  );
+
+  function navigate(nextDate: string) {
+    startTransition(() => router.push(`/appointments?date=${nextDate}`));
+  }
+
+  function confirmAppointment(id: string) {
+    setError(null);
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, status: "CONFIRMED" } : item,
+      ),
+    );
+    startTransition(async () => {
+      const result = await updateAppointmentStatus({ id, status: "CONFIRMED" });
+      if (!result.success) {
+        setItems((current) =>
+          current.map((item) =>
+            item.id === id ? { ...item, status: "PENDING" } : item,
+          ),
+        );
+        setError(result.message);
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border bg-card p-3 shadow-xs sm:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="اليوم السابق"
+            onClick={() => navigate(moveDate(date, -1))}
+            disabled={isPending}
+          >
+            <ChevronRightIcon />
+          </Button>
+          <div className="min-w-0 text-center">
+            <h2 className="truncate font-semibold">{formatDate(date)}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {date === today
+                ? "اليوم"
+                : arabicCount(items.length, APPOINTMENT_NOUNS)}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="اليوم التالي"
+            onClick={() => navigate(moveDate(date, 1))}
+            disabled={isPending}
+          >
+            <ChevronLeftIcon />
+          </Button>
+        </div>
+        {date !== today ? (
+          <div className="mt-2 text-center">
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              onClick={() => navigate(today)}
+            >
+              العودة إلى اليوم
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Select
+          value={filter}
+          onValueChange={(value) => setFilter(value as typeof filter)}
+        >
+          <SelectTrigger className="w-44" aria-label="تصفية حسب الحالة">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FILTERS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground" aria-live="polite">
+          {arabicCount(visible.length, APPOINTMENT_NOUNS)}
+        </span>
+      </div>
+
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      {visible.length === 0 ? (
+        <EmptyState
+          className="bg-card min-h-72"
+          icon={CalendarDaysIcon}
+          title={
+            items.length === 0
+              ? "لا توجد مواعيد في هذا اليوم"
+              : "لا توجد مواعيد بهذه الحالة"
+          }
+          description={
+            items.length === 0
+              ? "يمكنك إضافة موعد جديد وسيظهر هنا مرتباً حسب الوقت."
+              : "غيّر فلتر الحالة لعرض بقية مواعيد اليوم."
+          }
+          action={
+            items.length === 0 ? (
+              <Button asChild size="sm">
+                <Link href={`/appointments/new?date=${date}`}>
+                  <PlusIcon aria-hidden className="size-4" />
+                  إنشاء موعد
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilter("ALL")}
+              >
+                عرض كل الحالات
+              </Button>
+            )
+          }
+        />
+      ) : (
+        <ol className="relative space-y-3 before:absolute before:inset-y-4 before:start-[1.7rem] before:w-px before:bg-border sm:before:start-[4.25rem]">
+          {visible.map((appointment) => (
+            <li
+              key={appointment.id}
+              className="relative grid grid-cols-[3.4rem_minmax(0,1fr)] gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)]"
+            >
+              <div className="relative z-10 flex items-start gap-2 bg-background pt-4 text-sm font-semibold tabular-nums sm:justify-end sm:pe-4">
+                <Clock3Icon className="mt-0.5 size-3.5 text-muted-foreground sm:hidden" />
+                <time dateTime={appointment.startTime}>
+                  {formatTime(appointment.startTime)}
+                </time>
+              </div>
+              <article className="rounded-xl border bg-card p-4 shadow-xs transition-shadow hover:shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-semibold">
+                        {appointment.customer.name}
+                      </h3>
+                      <AppointmentStatusBadge status={appointment.status} />
+                    </div>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">
+                      {appointment.service.name} ·{" "}
+                      {appointment.service.durationMinutes} دقيقة
+                    </p>
+                    {appointment.notes ? (
+                      <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+                        {appointment.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {appointment.status === "PENDING" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => confirmAppointment(appointment.id)}
+                        disabled={isPending}
+                      >
+                        <CheckIcon />
+                        تأكيد
+                      </Button>
+                    ) : null}
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/appointments/${appointment.id}`}>
+                        التفاصيل
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+export { APPOINTMENT_STATUS_LABELS };

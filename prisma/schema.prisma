@@ -1,0 +1,263 @@
+// FlowPilot — Prisma schema
+// Domain model (Spec A): onboarding, conversations, appointments,
+// services, staff, customers.
+// No founder features, billing, or payments.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+enum ConversationStatus {
+  AI_ACTIVE
+  NEED_HUMAN
+  BOOKED
+  INCOMPLETE
+}
+
+enum MessageSenderType {
+  CUSTOMER
+  AI
+  STAFF
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+// ─── Core domain ─────────────────────────────────────────────
+
+model Business {
+  id                 String    @id @default(uuid())
+  name               String
+  city               String?
+  whatsappNumber     String
+   timezone           String    @default("Asia/Riyadh")
+   about              String?
+   /// JSON working-hours structure, e.g. { "sun": { "open": "09:00", "close": "21:00", "closed": false }, ... }
+   workingHours       Json?
+   slotDurationMinutes Int      @default(30) @map("slot_duration_minutes")
+   /// JSON FAQ entries: [{ "question": "...", "answer": "..." }]
+   faqs               Json?
+   cancellationPolicy String?
+   onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  users         User[]
+  services      Service[]
+  customers     Customer[]
+  conversations Conversation[]
+  appointments  Appointment[]
+
+  @@index([isActive])
+  @@map("businesses")
+}
+
+model Service {
+  id              String    @id @default(uuid())
+  businessId      String    @map("business_id")
+  name            String
+  description     String?
+  durationMinutes Int       @map("duration_minutes")
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([businessId])
+  @@index([businessId, isActive])
+  @@map("services")
+}
+
+model Customer {
+  id                String    @id @default(uuid())
+  businessId        String    @map("business_id")
+  name              String
+  phone             String
+  email             String?
+  notes             String?
+  lastConversationAt DateTime? @map("last_conversation_at")
+  lastAppointmentAt  DateTime? @map("last_appointment_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  appointments  Appointment[]
+
+  @@unique([businessId, phone])
+  @@index([businessId])
+  @@index([phone])
+  @@map("customers")
+}
+
+// ─── Conversations ───────────────────────────────────────────
+
+model Conversation {
+  id             String             @id @default(uuid())
+  businessId     String             @map("business_id")
+  customerId     String             @map("customer_id")
+  assignedUserId String?            @map("assigned_user_id")
+  status         ConversationStatus @default(AI_ACTIVE)
+  lastMessageAt  DateTime?          @map("last_message_at")
+  aiSummary      String?            @map("ai_summary")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at")
+  deletedAt      DateTime?          @map("deleted_at")
+
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  assignedTo  User?     @relation("ConversationAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  messages    Message[]
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([customerId])
+  @@index([assignedUserId])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String            @id @default(uuid())
+  conversationId String            @map("conversation_id")
+  senderType     MessageSenderType @map("sender_type")
+  content        String
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ─── Appointments ────────────────────────────────────────────
+
+model Appointment {
+  id             String            @id @default(uuid())
+  businessId     String            @map("business_id")
+  customerId     String            @map("customer_id")
+  serviceId      String            @map("service_id")
+  assignedUserId String?           @map("assigned_user_id")
+  date           DateTime          @db.Date
+  startTime      DateTime          @map("start_time") @db.Time
+  endTime        DateTime          @map("end_time") @db.Time
+  status         AppointmentStatus @default(PENDING)
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service    Service   @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  assignedTo User?     @relation("AppointmentAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([businessId, date])
+  @@index([status])
+  @@index([customerId])
+  @@index([serviceId])
+  @@map("appointments")
+}
+
+// ─── Users & auth ────────────────────────────────────────────
+// The Better Auth required fields stay untouched; domain fields
+// (business, role) extend the same `users` table.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @map("email_verified")
+  image         String?
+  // FlowPilot domain fields
+  businessId    String?   @map("business_id")
+  role          UserRole  @default(STAFF)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  business              Business?     @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  sessions              Session[]
+  accounts              Account[]
+  assignedConversations Conversation[] @relation("ConversationAssignee")
+  assignedAppointments  Appointment[]  @relation("AppointmentAssignee")
+
+  @@index([businessId])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id
+  userId                String    @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("verifications")
+}

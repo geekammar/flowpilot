@@ -1,3 +1,15 @@
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+  - "@prisma/client"
+  - "@prisma/engines"
+  - prisma
+  - better-auth
 allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
   sharp: false
-  unrs-resolver: false
+  unrs-resolver: true
+  workerd: false

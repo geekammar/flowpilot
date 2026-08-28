@@ -1,0 +1,48 @@
+#!/bin/sh
+# FlowPilot pre-commit hook — blocks accidental commits of secrets,
+# credentials, and environment files.
+# Installed via: pnpm run hooks:install  (sets git core.hooksPath=.githooks)
+# POSIX sh — works on Linux, macOS, Git Bash (Windows), and Termux.
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 1
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -z "$staged" ] && exit 0
+
+# 1. Filename gate (pure sh — runs even without node).
+#    Substring match; ".env.example" is the documented exception.
+FORBIDDEN=".env .pem .p12 .pfx id_rsa id_dsa id_ecdsa id_ed25519 service-account credentials.json"
+
+blocked=0
+for file in $staged; do
+  case "$file" in
+    .env.example) continue ;;
+  esac
+  for pattern in $FORBIDDEN; do
+    case "$file" in
+      *"$pattern"*)
+        printf '❌ pre-commit: refusing to commit forbidden file: %s (matched "%s")\n' "$file" "$pattern" >&2
+        printf '   → env & key files must never be committed. Unstage it:\n' >&2
+        printf '     git rm --cached "%s"\n' "$file" >&2
+        blocked=1
+        break
+        ;;
+    esac
+  done
+done
+
+[ "$blocked" -eq 1 ] && exit 1
+
+# 2. Content scan (needs node; skipped with a warning if unavailable)
+if command -v node >/dev/null 2>&1; then
+  if ! (cd "$ROOT" && node scripts/security-check.mjs --staged); then
+    printf '❌ pre-commit: security check found secrets in staged files.\n' >&2
+    printf '   → move them to .env.local (gitignored) and rotate any exposed values.\n' >&2
+    printf '   → to commit anyway (NOT recommended): git commit --no-verify\n' >&2
+    exit 1
+  fi
+else
+  printf '⚠️  pre-commit: node not found — secret CONTENT scan skipped (filename gate still applied).\n' >&2
+fi
+
+exit 0

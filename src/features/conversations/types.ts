@@ -1,0 +1,56 @@
+import type {
+  AppointmentStatus,
+  ConversationStatus,
+  MessageSenderType,
+} from "@/types/domain";
+
+export type InboxUser = {
+  id: string;
+  name: string;
+  image: string | null;
+};
+
+export type InboxConversation = {
+  id: string;
+  status: ConversationStatus;
+  customer: { id: string; name: string; phone: string };
+  assignedUser: InboxUser | null;
+  lastMessage: {
+    content: string;
+    senderType: MessageSenderType;
+    createdAt: string;
+  } | null;
+  lastActivityAt: string;
+};
+
+export type ConversationDetailData = {
+  id: string;
+  status: ConversationStatus;
+  aiSummary: string;
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+    notes: string | null;
+  };
+  assignedUser: InboxUser | null;
+  currentUserId: string;
+  messages: Array<{
+    id: string;
+    senderType: MessageSenderType;
+    content: string;
+    createdAt: string;
+  }>;
+  appointments: Array<{
+    id: string;
+    date: string;
+    startTime: string;
+    status: AppointmentStatus;
+    notes: string | null;
+    service: { name: string; durationMinutes: number };
+  }>;
+  team: InboxUser[];
+};
+
+export type ConversationActionResult =
+  { success: true } | { success: false; message: string };

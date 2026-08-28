@@ -1,0 +1,310 @@
+import type {
+  CreateAppointmentDto,
+  ListAppointmentsDto,
+  UpdateAppointmentDto,
+} from "@/lib/validation";
+import { paginationSchema, paginationToSkipTake } from "@/lib/validation";
+import { db } from "@/server/db";
+import type {
+  Appointment,
+  AppointmentStatus,
+  AppointmentWithRelations,
+} from "@/types/domain";
+
+const notDeleted = { deletedAt: null } as const;
+
+/** "YYYY-MM-DD" → UTC midnight Date (matches Prisma @db.Date). */
+function toDate(date: string): Date {
+  return new Date(`${date}T00:00:00.000Z`);
+}
+
+/** "HH:mm" or "HH:mm:ss" → epoch-based time value (matches @db.Time). */
+function toTime(time: string): Date {
+  const withSeconds = time.length === 5 ? `${time}:00` : time;
+  return new Date(`1970-01-01T${withSeconds}.000Z`);
+}
+
+function appointmentRange(input: ListAppointmentsDto) {
+  return {
+    ...(input.fromDate || input.toDate
+      ? {
+          date: {
+            ...(input.fromDate ? { gte: toDate(input.fromDate) } : {}),
+            ...(input.toDate ? { lte: toDate(input.toDate) } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+export class AppointmentRepository {
+  async findById(id: string): Promise<Appointment | null> {
+    return db.appointment.findFirst({ where: { id, ...notDeleted } });
+  }
+
+  /** Agenda view — customer + service projections preloaded. */
+  async findWithRelations(
+    id: string,
+  ): Promise<AppointmentWithRelations | null> {
+    return db.appointment.findFirst({
+      where: { id, ...notDeleted },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        service: {
+          select: { id: true, name: true, durationMinutes: true },
+        },
+      },
+    });
+  }
+
+  async findWithRelationsByBusiness(
+    id: string,
+    businessId: string,
+  ): Promise<AppointmentWithRelations | null> {
+    return db.appointment.findFirst({
+      where: { id, businessId, ...notDeleted },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        service: {
+          select: { id: true, name: true, durationMinutes: true },
+        },
+      },
+    });
+  }
+
+  async list(
+    input: ListAppointmentsDto,
+    rawPagination?: unknown,
+  ): Promise<AppointmentWithRelations[]> {
+    const pagination = paginationSchema.parse(rawPagination ?? {});
+    return db.appointment.findMany({
+      where: {
+        businessId: input.businessId,
+        ...notDeleted,
+        ...appointmentRange(input),
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.customerId ? { customerId: input.customerId } : {}),
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        service: {
+          select: { id: true, name: true, durationMinutes: true },
+        },
+      },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      ...paginationToSkipTake(pagination),
+    });
+  }
+
+  async listAgenda(businessId: string, date: string) {
+    return db.appointment.findMany({
+      where: { businessId, date: toDate(date), ...notDeleted },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        service: {
+          select: { id: true, name: true, durationMinutes: true },
+        },
+      },
+      orderBy: { startTime: "asc" },
+      take: 100,
+    });
+  }
+
+  async getDashboardSummary(businessId: string, date: string) {
+    const appointmentDate = toDate(date);
+    const [agenda, pendingCount, confirmedCount] = await db.$transaction([
+      db.appointment.findMany({
+        where: {
+          businessId,
+          date: appointmentDate,
+          ...notDeleted,
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          service: {
+            select: { id: true, name: true, durationMinutes: true },
+          },
+        },
+        orderBy: { startTime: "asc" },
+        take: 12,
+      }),
+      db.appointment.count({
+        where: {
+          businessId,
+          date: appointmentDate,
+          ...notDeleted,
+          status: "PENDING",
+        },
+      }),
+      db.appointment.count({
+        where: {
+          businessId,
+          date: appointmentDate,
+          ...notDeleted,
+          status: "CONFIRMED",
+        },
+      }),
+    ]);
+
+    return { agenda, pendingCount, confirmedCount };
+  }
+
+  async listRecentByCustomer(businessId: string, customerId: string) {
+    return db.appointment.findMany({
+      where: { businessId, customerId, ...notDeleted },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        service: {
+          select: { id: true, name: true, durationMinutes: true },
+        },
+      },
+      orderBy: [{ date: "desc" }, { startTime: "desc" }],
+      take: 3,
+    });
+  }
+
+  async create(input: CreateAppointmentDto): Promise<Appointment> {
+    const { date, startTime, endTime, assignedUserId, notes, ...rest } = input;
+    return db.appointment.create({
+      data: {
+        ...rest,
+        date: toDate(date),
+        startTime: toTime(startTime),
+        endTime: toTime(endTime),
+        ...(assignedUserId != null ? { assignedUserId } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+      },
+    });
+  }
+
+  async createWithConflictCheck(input: CreateAppointmentDto) {
+    const { date, startTime, endTime, assignedUserId, notes, ...rest } = input;
+    return db.$transaction(async (tx) => {
+      const conflict = await tx.appointment.count({
+        where: {
+          businessId: input.businessId,
+          ...notDeleted,
+          date: toDate(date),
+          status: { in: ["PENDING", "CONFIRMED"] },
+          ...(assignedUserId ? { assignedUserId } : {}),
+          startTime: { lt: toTime(endTime) },
+          endTime: { gt: toTime(startTime) },
+        },
+      });
+      if (conflict > 0) return null;
+
+      const appointment = await tx.appointment.create({
+        data: {
+          ...rest,
+          date: toDate(date),
+          startTime: toTime(startTime),
+          endTime: toTime(endTime),
+          ...(assignedUserId != null ? { assignedUserId } : {}),
+          ...(notes !== undefined ? { notes } : {}),
+        },
+      });
+      await tx.customer.update({
+        where: { id: input.customerId },
+        data: { lastAppointmentAt: new Date() },
+      });
+      return appointment;
+    });
+  }
+
+  async update(id: string, input: UpdateAppointmentDto): Promise<Appointment> {
+    const { date, startTime, endTime, assignedUserId, notes, ...rest } = input;
+    return db.appointment.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(date !== undefined ? { date: toDate(date) } : {}),
+        ...(startTime !== undefined ? { startTime: toTime(startTime) } : {}),
+        ...(endTime !== undefined ? { endTime: toTime(endTime) } : {}),
+        ...(assignedUserId !== undefined ? { assignedUserId } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+      },
+    });
+  }
+
+  async rescheduleWithConflictCheck(
+    id: string,
+    input: { date: string; startTime: string; endTime: string },
+  ) {
+    return db.$transaction(async (tx) => {
+      const appointment = await tx.appointment.findFirst({
+        where: { id, ...notDeleted },
+      });
+      if (!appointment) return null;
+      const conflict = await tx.appointment.count({
+        where: {
+          businessId: appointment.businessId,
+          ...notDeleted,
+          id: { not: id },
+          date: toDate(input.date),
+          status: { in: ["PENDING", "CONFIRMED"] },
+          ...(appointment.assignedUserId
+            ? { assignedUserId: appointment.assignedUserId }
+            : {}),
+          startTime: { lt: toTime(input.endTime) },
+          endTime: { gt: toTime(input.startTime) },
+        },
+      });
+      if (conflict > 0) return null;
+
+      return tx.appointment.update({
+        where: { id },
+        data: {
+          date: toDate(input.date),
+          startTime: toTime(input.startTime),
+          endTime: toTime(input.endTime),
+        },
+      });
+    });
+  }
+
+  async setStatus(id: string, status: AppointmentStatus) {
+    return db.appointment.update({ where: { id }, data: { status } });
+  }
+
+  /** Overlap check for a staff member (or the whole business when unassigned). */
+  async hasConflict(params: {
+    businessId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    assignedUserId?: string | null;
+    excludeAppointmentId?: string;
+  }): Promise<boolean> {
+    const count = await db.appointment.count({
+      where: {
+        businessId: params.businessId,
+        ...notDeleted,
+        date: toDate(params.date),
+        status: {
+          in: ["PENDING", "CONFIRMED"] as AppointmentStatus[],
+        },
+        ...(params.assignedUserId
+          ? { assignedUserId: params.assignedUserId }
+          : {}),
+        ...(params.excludeAppointmentId
+          ? { id: { not: params.excludeAppointmentId } }
+          : {}),
+        startTime: { lt: toTime(params.endTime) },
+        endTime: { gt: toTime(params.startTime) },
+      },
+    });
+    return count > 0;
+  }
+
+  async softDelete(id: string): Promise<Appointment> {
+    return db.appointment.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async restore(id: string): Promise<Appointment> {
+    return db.appointment.update({ where: { id }, data: { deletedAt: null } });
+  }
+}

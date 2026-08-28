@@ -1,36 +1,173 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowPilot
+
+A WhatsApp Appointment Conversion System. Book more, chase less.
+
+**Current stage:** Local Vertical Discovery Strategy — the same generic booking
+engine is being tested across multiple appointment-based businesses (dental,
+beauty, coaching, gyms, education, services) before selecting a winning
+vertical. **The UI and domain model stay completely vertical-agnostic.**
+
+> 📚 **Project memory / source of truth:** start with
+> [`docs/PROJECT_README.md`](docs/PROJECT_README.md), then follow
+> [`docs/AGENT_RULES.md`](docs/AGENT_RULES.md) before making any change.
+
+---
+
+## Tech Stack
+
+| Layer     | Choice                         |
+| --------- | ------------------------------ |
+| Framework | Next.js (App Router) + React   |
+| Language  | TypeScript (strict)            |
+| Styling   | Tailwind CSS v4                |
+| UI        | shadcn/ui + Lucide icons       |
+| State     | TanStack Query                 |
+| Forms     | React Hook Form + Zod          |
+| Auth      | Better Auth                    |
+| Database  | PostgreSQL (Neon)              |
+| ORM       | Prisma (driver-adapter client) |
+| Charts    | Recharts                       |
+| Deploy    | Vercel                         |
+| Pkg mgr   | pnpm                           |
 
 ## Getting Started
 
-First, run the development server:
+One-time bootstrap per platform (verifies node/pnpm/git/gh, installs only what
+is missing, then sets up the project):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bash scripts/bootstrap.sh                  # macOS / Linux
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap.ps1   # Windows
+bash scripts/bootstrap-termux.sh           # Termux (Android)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then set `DATABASE_URL` in `.env.local` (created automatically with a random
+auth secret) and start development:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bash scripts/dev.sh                        # or dev.ps1 / dev-termux.sh
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prefer the manual path? Equivalent commands:
 
-## Learn More
+```bash
+pnpm run setup       # env file (safe, never overwrites) + install + prisma generate
+pnpm run doctor      # environment diagnostics
+pnpm dev             # http://localhost:3000 (use --webpack on Termux)
+```
 
-To learn more about Next.js, take a look at the following resources:
+Full platform guide: [docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See `.env.example`:
 
-## Deploy on Vercel
+| Variable              | Purpose                                 |
+| --------------------- | --------------------------------------- |
+| `DATABASE_URL`        | Neon PostgreSQL connection string       |
+| `BETTER_AUTH_SECRET`  | Auth signing secret (min 32 chars)      |
+| `BETTER_AUTH_URL`     | Base URL used by Better Auth            |
+| `NEXT_PUBLIC_APP_URL` | Public app URL (also used for metadata) |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+All server env vars are validated at runtime with Zod in `src/lib/env.ts` —
+the app fails fast with a readable message if anything is missing. Env files
+(`.env*`) are gitignored; `.env.local` takes precedence over `.env` in the dev
+server, Prisma CLI, and seed script alike.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+| Command                  | Description                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `pnpm run setup`         | Create `.env.local` (safe) + install deps + generate Prisma client + install git hooks |
+| `pnpm run doctor`        | Project health check → READY / NOT READY with fixes                                    |
+| `pnpm verify`            | Full quality gate: lint + typecheck + format + build (Termux-aware)                    |
+| `pnpm security`          | Secret scan (env files, keys, tokens, credentials)                                     |
+| `pnpm release`           | Gated release: doctor+verify+security → commit → tag → GitHub repo/release             |
+| `pnpm run hooks:install` | Install the pre-commit safety hook                                                     |
+| `pnpm dev`               | Dev server (Turbopack; `--webpack` on Termux)                                          |
+| `pnpm build`             | Production build                                                                       |
+| `pnpm lint`              | ESLint                                                                                 |
+| `pnpm lint:fix`          | ESLint with autofix                                                                    |
+| `pnpm format`            | Prettier write                                                                         |
+| `pnpm format:check`      | Prettier check (CI-friendly)                                                           |
+| `pnpm typecheck`         | `tsc --noEmit`                                                                         |
+| `pnpm db:generate`       | Generate Prisma client                                                                 |
+| `pnpm db:migrate`        | Create/apply a dev migration                                                           |
+| `pnpm db:deploy`         | Apply migrations (prod/CI)                                                             |
+| `pnpm db:push`           | Push schema without migration                                                          |
+| `pnpm db:studio`         | Prisma Studio                                                                          |
+| `pnpm db:seed`           | Seed Arabic demo data                                                                  |
+| `pnpm icons`             | Regenerate PWA PNG icons                                                               |
+
+> `setup` and `doctor` require `pnpm run …` — without `run` they collide with
+> pnpm's built-in commands of the same name.
+
+## Architecture
+
+Feature-based modular monolith:
+
+```
+src/
+├── app/                    # Routing layer only (thin)
+│   ├── (auth)/             #   sign-in / sign-up — public auth screens
+│   ├── (app)/              #   main authenticated app shell
+│   ├── (admin)/            #   admin area (guards added later)
+│   ├── (staff)/            #   staff area (guards added later)
+│   ├── api/auth/[...all]/  #   Better Auth route handler
+│   ├── error.tsx           #   route error boundary
+│   ├── global-error.tsx    #   root error boundary
+│   ├── not-found.tsx
+│   └── manifest.ts         #   PWA web app manifest
+├── features/               # Domain modules — isolated from each other
+│   ├── auth/               #   sessions, sign-in/out flows
+│   ├── onboarding/         #   first-run setup (vertical-agnostic)
+│   ├── services/           #   bookable service catalog
+│   ├── appointments/       #   booking lifecycle
+│   ├── conversations/      #   WhatsApp threads & templates
+│   ├── customers/          #   customer directory & history
+│   └── staff/              #   team, roles, availability
+├── components/
+│   ├── ui/                 # shadcn/ui primitives
+│   └── shared/             # cross-feature components (providers, etc.)
+├── hooks/                  # cross-feature client hooks
+├── lib/                    # framework-agnostic utilities (env, auth, utils)
+├── server/                 # server-only layer (db client singleton)
+└── types/                  # small shared type contracts
+```
+
+## Development Guidelines
+
+1. **Routes are thin.** `src/app` files render feature components; no business
+   logic in route files.
+2. **Features are isolated.** A feature may import from `@/components/ui`,
+   `@/lib/*`, `@/server/*`, `@/types`, and itself — never from another
+   feature. Cross-feature composition happens at the route layer.
+3. **No circular dependencies.** If two features share logic, promote it to
+   `@/lib` or `@/server` deliberately.
+4. **No giant shared files.** Prefer many small, single-purpose modules over
+   shared barrels and mega-utils.
+5. **Strong typing everywhere.** Strict TS is on (`noUncheckedIndexedAccess`,
+   `noUnusedLocals`, …). Validate inputs with Zod at the boundary; infer
+   types from schemas instead of hand-writing duplicates.
+6. **Server layer is reusable.** DB access goes through the `db` singleton
+   (`src/server/db`). Never construct ad-hoc clients.
+7. **UI is reusable and generic.** Build on shadcn/ui primitives; keep all
+   copy free of vertical-specific terminology (this is a hard product rule
+   during vertical discovery).
+8. **Quality gates before pushing:**
+   ```bash
+   pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+   ```
+9. **Imports are auto-sorted** by Prettier (`@ianvs/prettier-plugin-sort-imports`)
+   with Tailwind class sorting enabled.
+
+## Notes
+
+- Database layer (schema, validation, repositories, seed): see
+  [docs/DATABASE.md](docs/DATABASE.md).
+- This project uses the current Next.js release (16.x), which differs from
+  Next.js 13–15 habits: request APIs (`cookies()`, `params`, `searchParams`)
+  are async, `middleware.ts` is replaced by `proxy.ts`, and error boundaries
+  receive `{ error, retry }`. See `node_modules/next/dist/docs/`.
+- Prisma client is generated to `src/generated/prisma` (gitignored) and uses
+  the `pg` driver adapter for Neon compatibility.
