@@ -24,6 +24,9 @@ pnpm dev            # then open http://localhost:3000/sign-in
 Automatic option — add `DEMO_MODE="true"` to `.env.local` and always start
 with `bash scripts/dev.sh` (or `dev.ps1` / `dev-termux.sh`): the demo data
 re-seeds itself on every launch (best effort, never blocks the server).
+Deploying a demo for a prospect? The same `DEMO_MODE=true` makes every
+`pnpm deploy` re-seed first, so the deployed URL is demo-ready — see
+`docs/CLIENT_DEMO.md` for the shareable demo package.
 
 ## The Demo Business: عيادة الابتسامة
 

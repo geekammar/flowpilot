@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: Ops 05.
+> Last updated: Ops 06 (Pilot Distribution System).
 
 ## Prompt 01 — Repository Foundation
 
@@ -734,6 +734,112 @@ isEmpty logic), `scripts/{dev.sh,dev-termux.sh,dev.ps1}` (DEMO_MODE step),
 
 ---
 
+## Ops 06 — Pilot Distribution System (Prompt 10.5F, DX Only)
+
+**Status:** ✅ Complete
+
+> Operator-requested distribution pass: transform the project into a **Pilot
+> Distribution System** — easy to deploy, share, demo, distribute, and test
+> with real prospects. Only deployment/distribution/demo/release workflows;
+> no business logic, schema, UI, or architecture changes, no new product
+> modules, no new dependencies.
+
+### Completed Work
+
+- **Audit**: `docs/PILOT_DISTRIBUTION_AUDIT.md` — current state, 7 bottlenecks
+  (no single `pnpm deploy` entry point; demo data outside the deploy path; no
+  URL capture; no auth/link pre-flight; DB not part of the deploy gate;
+  liveness-only health; undocumented preview/prod differences), deployment +
+  distribution friction, baseline scores (overall 4.8/10 → target 9/10).
+- **Pre-deploy gate**: `scripts/pre-deploy.mjs` (`pnpm deploy:check`) —
+  environment (reuses `vercel-check.mjs`), Prisma generation (auto-generates),
+  database connection (SELECT 1, classified errors) + schema applied
+  (information_schema table check → "run pnpm db:deploy" fix), auth
+  configuration (secret, URLs, origin consistency), deployment configuration
+  (vercel.json buildCommand, postinstall generate, project-link state),
+  demo data (`DEMO_MODE=true` → re-seed + verify counts: business, 2 users,
+  customers, conversations, appointments), build validation (typecheck +
+  `next build`, Termux `--webpack` aware; `--fast` skips). Verdict:
+  **READY / NOT READY** with actionable fixes; secrets never printed.
+- **Deploy commands** (`scripts/deploy.mjs` rewritten): `pnpm deploy`
+  (default → production), `pnpm deploy:production`, `pnpm deploy:preview`,
+  `pnpm deploy:check`; legacy `deploy:vercel` kept as alias. Verified that
+  `pnpm deploy` runs the script (it shadows pnpm's built-in deploy when
+  defined — unlike `setup`/`doctor`). Flow: full pre-deploy gate → Vercel
+  auth pre-flight (`whoami`; logged-out detected by exit code AND output,
+  instructions printed — never fails silently) → link pre-flight
+  (`.vercel/project.json`) → `vercel deploy [--prod]` with live output
+  capture → **deployment URL parsed and printed** (✅ Production/Preview line
+  first, last `*.vercel.app` fallback) + validation steps + demo guidance;
+  preview output warns that auth needs the production URL.
+- **Health endpoint v2** (`/api/health`): now returns `status`, `version`,
+  `environment`, `timestamp`, `deploymentReady`, `database`
+  (connected/unreachable/not-configured — 3s race-timeout probe through the
+  app's own Prisma client via dynamic `@/server/db` import; no new
+  dependencies, no new types), `missingEnvVars`. Still public via
+  `proxy.ts`, still `force-dynamic`, liveness 200 even when DB is down.
+- **Demo deployment experience**: `DEMO_MODE=true` now gates **deployments**
+  too — every `pnpm deploy:*` re-seeds the demo dataset first (idempotent,
+  demo-business-scoped) and verifies counts, so a deployed demo never shows
+  empty dashboards; stale "today" timestamps are refreshed per deploy.
+- **Distribution docs**:
+  - `docs/VERCEL_QUICK_DEPLOY.md` — one-page deploy in < 5 minutes
+    (prerequisites, one command, env table incl. `DEMO_MODE`, URL
+    chicken-and-egg note, verification).
+  - `docs/CLIENT_DEMO.md` — prospect-facing demo package: demo URL, demo
+    credentials, 5-minute suggested walkthrough, what to show first, typical
+    client questions (AR/EN objection table), recommended sales flow, next
+    steps after demo.
+  - `docs/DEPLOYMENT_STATUS.md` — deployment/preview/production/demo
+    readiness + known issues.
+  - `docs/PILOT_DISTRIBUTION_REPORT.md` — final report (files, commands,
+    workflows, remaining manual steps, next actions).
+- **Doc updates**: README (deploy commands table + quick-deploy/demo-package
+  pointers + DEMO_MODE deploy note), `VERCEL_DEPLOYMENT.md` (new commands,
+  new health JSON, `deploymentReady:false` troubleshooting row),
+  `ENVIRONMENT_VARIABLES.md` (DEMO_MODE deploy semantics + health fields),
+  `QUALITY_CHECKS.md` (deploy commands in the command map), `DEMO_GUIDE.md`
+  (deploy-time seeding note).
+
+### Generated Files
+
+`scripts/pre-deploy.mjs`, `docs/{PILOT_DISTRIBUTION_AUDIT,VERCEL_QUICK_DEPLOY,
+CLIENT_DEMO,DEPLOYMENT_STATUS,PILOT_DISTRIBUTION_REPORT}.md`; rewritten
+`scripts/deploy.mjs`; updated `src/app/api/health/route.ts`, `package.json`
+(deploy/deploy:production/deploy:check scripts), `README.md`,
+`docs/{VERCEL_DEPLOYMENT,ENVIRONMENT_VARIABLES,QUALITY_CHECKS,DEMO_GUIDE}.md`.
+
+### Verification
+
+- `node --check` on both scripts ✅; URL parser + login-detection unit-tested
+  against real Vercel CLI output samples (5/5 parser cases, 4/4 auth cases) ✅
+- `pnpm deploy:check` live: NOT READY on this device's placeholder
+  `DATABASE_URL` with per-check fixes; with valid-shaped env: env/prisma/auth/
+  config checks pass, DB unreachable correctly classified (DNS fix), demo +
+  build steps informative; `--fast` build skip verified ✅
+- `pnpm deploy` / `deploy:preview` / `deploy:production` live: abort at the
+  pre-deploy gate with clear next actions; usage message on bad mode ✅
+- `pnpm dlx vercel@latest whoami` live: exit 1 + "Logged out" — auth
+  pre-flight logic double-covered against real CLI behavior ✅
+- `pnpm verify` full gate (lint/typecheck/format/build --webpack) ✅
+- `next start` + `curl /api/health`: full readiness JSON with `deploymentReady`
+  reflecting the placeholder DB ✅ (see Known Issues)
+- `pnpm security` ✅
+
+### Known Issues
+
+- Deploying still requires user actions (by design): `vercel login` +
+  `vercel link` (or GitHub import), the four env vars in Vercel project
+  settings (Production + Preview), `pnpm db:deploy` against Neon from
+  desktop/CI, and a real `DATABASE_URL` locally.
+- First-deploy URL chicken-and-egg (URLs must equal the final domain) is
+  documented with two resolutions in `VERCEL_QUICK_DEPLOY.md` — not
+  automatable without knowing the intended project name.
+- Health DB probe may add up to 3s on cold/suspended Neon (race timeout);
+  liveness (`status`) is unaffected.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -769,6 +875,17 @@ isEmpty logic), `scripts/{dev.sh,dev-termux.sh,dev.ps1}` (DEMO_MODE step),
   auto-seed hook in dev launchers, and `docs/DEMO_GUIDE.md` +
   `docs/DEMO_SCRIPT.md`. **Demo Readiness: READY** — re-seed before each
   demo (`pnpm db:seed` or `DEMO_MODE=true`).
+- **Ops 06 (Pilot Distribution System, Prompt 10.5F) complete:** `pnpm deploy`
+  / `deploy:production` / `deploy:preview` / `deploy:check` gated commands
+  with deployment-URL capture and Vercel auth/link pre-flight;
+  `scripts/pre-deploy.mjs` readiness gate (env, DB, schema, Prisma, auth,
+  demo data, build); `DEMO_MODE=true` now seeds as part of every deploy;
+  `/api/health` reports timestamp + DB reachability + deployment readiness;
+  distribution docs (`VERCEL_QUICK_DEPLOY.md`, `CLIENT_DEMO.md`,
+  `DEPLOYMENT_STATUS.md`, `PILOT_DISTRIBUTION_REPORT.md`). **Pilot
+  Distribution: READY (code side)** — remaining steps are user actions
+  (vercel login/link, Vercel env vars, `pnpm db:deploy`) — see
+  `docs/VERCEL_QUICK_DEPLOY.md`.
 - **Next Step:** Prompt 09 — complete the Arabic Better Auth sign-up
   flow, then continue with the next requested Spec A operational screen
   (recommended order: Customers directory → Staff area → Services →

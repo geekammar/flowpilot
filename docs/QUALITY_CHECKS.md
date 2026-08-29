@@ -10,6 +10,9 @@
 | `pnpm verify`       | Full quality gate: lint → typecheck → format → build (+ summary)                                               | Before finishing ANY work (binding)                     |
 | `pnpm run doctor`   | Project health: OS, node, pnpm, git, gh, env, Prisma, DB connection, deps, build readiness → READY / NOT READY | After setup, after env changes, when anything feels off |
 | `pnpm security`     | Secret scan: env-file hygiene, secret quality, secret-shaped content in committable files                      | Before pushing; runs automatically pre-commit           |
+| `pnpm vercel:check` | Deployment env validation (4 required vars, per-var fixes)                                                     | Before configuring Vercel / part of every deploy        |
+| `pnpm deploy:check` | Pre-deploy gate: env + database + Prisma + auth + demo data + build → READY / NOT READY                        | Before every deploy; `-- --fast` skips the build step   |
+| `pnpm deploy`       | Full pre-deploy gate → Vercel production deploy → deployment URL                                               | Sharing a demo-able URL with a prospect                 |
 | `pnpm lint`         | `eslint .`                                                                                                     | While coding (or `lint:fix`)                            |
 | `pnpm typecheck`    | `tsc --noEmit`                                                                                                 | While coding                                            |
 | `pnpm format:check` | `prettier --check .`                                                                                           | Before verify (or run `pnpm format`)                    |

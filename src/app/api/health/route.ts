@@ -2,10 +2,54 @@ import pkg from "../../../../package.json";
 
 export const dynamic = "force-dynamic";
 
+const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "NEXT_PUBLIC_APP_URL",
+] as const;
+
+const DATABASE_PROBE_TIMEOUT_MS = 3_000;
+
+type DatabaseStatus = "connected" | "unreachable" | "not-configured";
+
+async function checkDatabase(): Promise<DatabaseStatus> {
+  if (!process.env.DATABASE_URL) return "not-configured";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // Probe through the app's own Prisma client (the same connection the app
+    // uses). A failed module load (e.g. invalid env) counts as unreachable.
+    const probe = (async () => {
+      const { db } = await import("@/server/db");
+      await db.$queryRaw`SELECT 1`;
+      return "connected" as const;
+    })();
+    probe.catch(() => {}); // the losing side of the race must not crash
+    const timeout = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), DATABASE_PROBE_TIMEOUT_MS);
+    });
+    const result = await Promise.race([probe, timeout]);
+    return result === "connected" ? "connected" : "unreachable";
+  } catch {
+    return "unreachable";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function GET() {
+  const missingEnvVars = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+  const database = await checkDatabase();
+  const deploymentReady =
+    missingEnvVars.length === 0 && database === "connected";
+
   return Response.json({
     status: "ok",
     version: pkg.version,
     environment: process.env.NODE_ENV ?? "development",
+    timestamp: new Date().toISOString(),
+    deploymentReady,
+    database,
+    missingEnvVars,
   });
 }

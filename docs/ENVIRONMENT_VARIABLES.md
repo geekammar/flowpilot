@@ -80,16 +80,21 @@ Notes:
 
 ## Optional Variables
 
-| Variable    | Default | Purpose                                                                                                                                                                                                                                            |
-| ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEMO_MODE` | unset   | `"true"` → the dev launcher scripts (`scripts/dev.sh` / `dev.ps1` / `dev-termux.sh`) re-seed the Arabic demo business before starting the dev server (best effort, never blocks; requires a real `DATABASE_URL`). Never used by production builds. |
+| Variable    | Default | Purpose                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEMO_MODE` | unset   | `"true"` → the dev launcher scripts (`scripts/dev.sh` / `dev.ps1` / `dev-termux.sh`) **and** the deploy gate (`scripts/pre-deploy.mjs`, run by every `pnpm deploy:*` command) re-seed the Arabic demo business first — deployed demos never show empty dashboards. Idempotent, demo-business-scoped wipe; requires a real `DATABASE_URL`. Never used by production builds. |
 
 ## Optional Platform Variables (provided by Vercel, informational)
 
-| Variable     | Provided by Vercel        | FlowPilot usage                                  |
-| ------------ | ------------------------- | ------------------------------------------------ |
-| `VERCEL_URL` | deployment host per build | not required by the app; useful for quick checks |
-| `VERCEL_ENV` | `production` / `preview`  | `/api/health` reports `NODE_ENV` (same value)    |
+| Variable     | Provided by Vercel        | FlowPilot usage                                              |
+| ------------ | ------------------------- | ------------------------------------------------------------ |
+| `VERCEL_URL` | deployment host per build | not required by the app; useful for quick checks             |
+| `VERCEL_ENV` | `production` / `preview`  | informational; `/api/health` reports `NODE_ENV` (same value) |
+
+`/api/health` additionally reports `timestamp`, `database` reachability
+(connected / unreachable / not-configured — 3s probe through the app's Prisma
+client), `missingEnvVars`, and a boolean `deploymentReady` — the single URL to
+check before sharing a deployment (`docs/CLIENT_DEMO.md` Section 1).
 
 Full step-by-step: `VERCEL_DEPLOYMENT.md` · What each check covers:
 `QUALITY_CHECKS.md`.

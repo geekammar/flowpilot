@@ -30,8 +30,10 @@ vertical. **The UI and domain model stay completely vertical-agnostic.**
 | Deploy    | Vercel                         |
 | Pkg mgr   | pnpm                           |
 
-Deployment: `docs/VERCEL_DEPLOYMENT.md` · Environment variables:
-`docs/ENVIRONMENT_VARIABLES.md` · Liveness probe: `/api/health`.
+Deployment quick path (< 5 min): `docs/VERCEL_QUICK_DEPLOY.md` · Full guide:
+`docs/VERCEL_DEPLOYMENT.md` · Environment variables:
+`docs/ENVIRONMENT_VARIABLES.md` · Demo package for prospects:
+`docs/CLIENT_DEMO.md` · Liveness/readiness probe: `/api/health`.
 
 ## Getting Started
 
@@ -79,32 +81,34 @@ server, Prisma CLI, and seed script alike.
 
 ## Scripts
 
-| Command                  | Description                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------- |
-| `pnpm run setup`         | Create `.env.local` (safe) + install deps + generate Prisma client + install git hooks |
-| `pnpm run doctor`        | Project health check → READY / NOT READY with fixes                                    |
-| `pnpm verify`            | Full quality gate: lint + typecheck + format + build (Termux-aware)                    |
-| `pnpm security`          | Secret scan (env files, keys, tokens, credentials)                                     |
-| `pnpm release`           | Gated release: doctor+verify+security → commit → tag → GitHub repo/release             |
-| `pnpm vercel:check`      | Deployment environment validation (4 required variables, clear fixes)                  |
-| `pnpm deploy:check`      | Deployment readiness: env gate + full quality gate → verdict                           |
-| `pnpm deploy:preview`    | Env + build validation → Vercel preview deployment                                     |
-| `pnpm deploy:vercel`     | Env + full quality gate → Vercel production deployment                                 |
-| `pnpm run hooks:install` | Install the pre-commit safety hook                                                     |
-| `pnpm dev`               | Dev server (Turbopack; `--webpack` on Termux)                                          |
-| `pnpm build`             | Production build                                                                       |
-| `pnpm lint`              | ESLint                                                                                 |
-| `pnpm lint:fix`          | ESLint with autofix                                                                    |
-| `pnpm format`            | Prettier write                                                                         |
-| `pnpm format:check`      | Prettier check (CI-friendly)                                                           |
-| `pnpm typecheck`         | `tsc --noEmit`                                                                         |
-| `pnpm db:generate`       | Generate Prisma client                                                                 |
-| `pnpm db:migrate`        | Create/apply a dev migration                                                           |
-| `pnpm db:deploy`         | Apply migrations (prod/CI)                                                             |
-| `pnpm db:push`           | Push schema without migration                                                          |
-| `pnpm db:studio`         | Prisma Studio                                                                          |
-| `pnpm db:seed`           | Seed the Arabic demo dataset (Egyptian dental clinic — see docs/DEMO_GUIDE.md)         |
-| `pnpm icons`             | Regenerate PWA PNG icons                                                               |
+| Command                  | Description                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `pnpm run setup`         | Create `.env.local` (safe) + install deps + generate Prisma client + install git hooks   |
+| `pnpm run doctor`        | Project health check → READY / NOT READY with fixes                                      |
+| `pnpm verify`            | Full quality gate: lint + typecheck + format + build (Termux-aware)                      |
+| `pnpm security`          | Secret scan (env files, keys, tokens, credentials)                                       |
+| `pnpm release`           | Gated release: doctor+verify+security → commit → tag → GitHub repo/release               |
+| `pnpm vercel:check`      | Deployment environment validation (4 required variables, clear fixes)                    |
+| `pnpm deploy:check`      | Pre-deploy gate: env + database + Prisma + auth + demo data + build → READY / NOT READY  |
+| `pnpm deploy`            | Full gate → Vercel **production** deploy → prints the shareable deployment URL           |
+| `pnpm deploy:production` | Same as `pnpm deploy` (explicit alias)                                                   |
+| `pnpm deploy:preview`    | Full gate → Vercel preview deploy → URL (internal checks; auth may not work on previews) |
+| `pnpm deploy:vercel`     | Legacy alias for `pnpm deploy:production`                                                |
+| `pnpm run hooks:install` | Install the pre-commit safety hook                                                       |
+| `pnpm dev`               | Dev server (Turbopack; `--webpack` on Termux)                                            |
+| `pnpm build`             | Production build                                                                         |
+| `pnpm lint`              | ESLint                                                                                   |
+| `pnpm lint:fix`          | ESLint with autofix                                                                      |
+| `pnpm format`            | Prettier write                                                                           |
+| `pnpm format:check`      | Prettier check (CI-friendly)                                                             |
+| `pnpm typecheck`         | `tsc --noEmit`                                                                           |
+| `pnpm db:generate`       | Generate Prisma client                                                                   |
+| `pnpm db:migrate`        | Create/apply a dev migration                                                             |
+| `pnpm db:deploy`         | Apply migrations (prod/CI)                                                               |
+| `pnpm db:push`           | Push schema without migration                                                            |
+| `pnpm db:studio`         | Prisma Studio                                                                            |
+| `pnpm db:seed`           | Seed the Arabic demo dataset (Egyptian dental clinic — see docs/DEMO_GUIDE.md)           |
+| `pnpm icons`             | Regenerate PWA PNG icons                                                                 |
 
 > `setup` and `doctor` require `pnpm run …` — without `run` they collide with
 > pnpm's built-in commands of the same name.
@@ -172,7 +176,10 @@ src/
 
 - Demo: realistic Arabic dataset with demo logins — `docs/DEMO_GUIDE.md`
   (setup, scenarios) and `docs/DEMO_SCRIPT.md` (5-minute sales walkthrough).
-  Set `DEMO_MODE=true` in `.env.local` to auto-seed on dev launch.
+  Client-facing demo package (URL + credentials + what to show):
+  `docs/CLIENT_DEMO.md`. Set `DEMO_MODE=true` in `.env.local` to auto-seed on
+  dev launch **and** before every deploy (`pnpm deploy` runs it as part of its
+  gate, so deployed demos are never empty).
 - Database layer (schema, validation, repositories, seed): see
   [docs/DATABASE.md](docs/DATABASE.md).
 - This project uses the current Next.js release (16.x), which differs from
