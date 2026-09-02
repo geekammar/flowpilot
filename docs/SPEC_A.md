@@ -1,7 +1,7 @@
 # FlowPilot — Spec A (Current Scope)
 
 > The complete, frozen scope of the current build. Anything not listed under
-> "Included" is out of scope. Last updated: Prompt 03.
+> "Included" is out of scope. Last updated: Prompt 09 (auth model alignment).
 
 ## Scope Definition
 
@@ -15,16 +15,26 @@ collect evidence.
 
 ### 1. Login
 
-- Email + password sign-in / sign-up (Better Auth)
+- Email + password sign-in (Better Auth) — the single authentication system
 - Session persistence; protected route groups `(app)`, `(admin)`, `(staff)`
 - Arabic-first auth screens on centered-card layout
+- Account creation for the current pilot stage is **invitation-first** (see
+  `ARCHITECTURE.md → Authentication & Authorization Model` and
+  `DECISIONS.md` #22): the Platform Operator provisions the Business and
+  invites the initial `ADMIN`; the invitee accepts and activates the account
+  (sets a password). Public self-sign-up is NOT the primary pilot flow — it
+  remains a possible future self-serve acquisition mode, and the
+  authentication architecture must not prevent it
 
 ### 2. Onboarding
 
-- Post-signup flow: create Business (name, city, WhatsApp number, timezone,
+- Runs after invitation-based ADMIN account activation (not after public
+  sign-up): complete Business setup (name, city, WhatsApp number, timezone,
   about, working hours, cancellation policy)
-- Links authenticated user as `ADMIN` of the new business
+- Links the activated user as `ADMIN` of the business
 - Repeatable checklist pattern for pilot onboarding
+- The onboarding wizard implementation already exists; future work is to
+  refine/reconnect it with the invitation-based lifecycle (planned)
 
 ### 3. Business Setup
 
@@ -101,22 +111,27 @@ collect evidence.
 
 ## Screens (Included)
 
-| Route group | Screen                | Purpose                                  |
-| ----------- | --------------------- | ---------------------------------------- |
-| `(auth)`    | `/sign-in`            | Login                                    |
-| `(auth)`    | `/sign-up`            | Registration                             |
-| `(app)`     | `/onboarding`         | Business creation wizard                 |
-| `(app)`     | `/`                   | Dashboard                                |
-| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions |
-| `(app)`     | `/conversations`      | Thread list                              |
-| `(app)`     | `/conversations/[id]` | Thread view + staff reply                |
-| `(app)`     | `/customers`          | Customer directory                       |
-| `(app)`     | `/customers/[id]`     | Customer profile/history                 |
-| `(app)`     | `/services`           | Service catalog management               |
-| `(app)`     | `/settings/business`  | Business setup                           |
-| `(app)`     | `/settings/knowledge` | Business knowledge entries               |
-| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)       |
-| `(admin)`   | `/admin/team`         | Team management                          |
-| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)      |
+| Route group | Screen                | Purpose                                                                             |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `(auth)`    | `/sign-in`            | Login                                                                               |
+| `(auth)`    | invitation acceptance | Accept invitation, set password, activate account (planned — invitation foundation) |
+| `(app)`     | `/onboarding`         | Business onboarding wizard (after ADMIN activation)                                 |
+| `(app)`     | `/`                   | Dashboard                                                                           |
+| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions                                            |
+| `(app)`     | `/conversations`      | Thread list                                                                         |
+| `(app)`     | `/conversations/[id]` | Thread view + staff reply                                                           |
+| `(app)`     | `/customers`          | Customer directory                                                                  |
+| `(app)`     | `/customers/[id]`     | Customer profile/history                                                            |
+| `(app)`     | `/services`           | Service catalog management                                                          |
+| `(app)`     | `/settings/business`  | Business setup                                                                      |
+| `(app)`     | `/settings/knowledge` | Business knowledge entries                                                          |
+| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                  |
+| `(admin)`   | `/admin/team`         | Team management                                                                     |
+| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)                                                 |
 
 Route groups/layouts already exist; individual screens land prompt-by-prompt.
+The public `/sign-up` route exists today as a placeholder only and is no
+longer a Spec A deliverable — invitation-based activation replaces it as the
+pilot account-creation flow. Exact invitation route naming is an
+implementation decision for the next prompt. Do NOT add Founder Console or
+any Spec B functionality here.

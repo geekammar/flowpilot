@@ -2,7 +2,7 @@
 
 PostgreSQL (Neon) · Prisma 7 · UUID primary keys everywhere.
 
-## Entities & Relationships
+## Entities & Relationships (Current Implemented Model)
 
 ```
 Business 1 ──* User            (staff/admin belong to one business)
@@ -11,21 +11,24 @@ Business 1 ──* Customer
 Business 1 ──* Conversation    Conversation *──1 Customer
 Conversation 1 ──* Message     Message *──1 User?  (via conversation assignee)
 Business 1 ──* Appointment     Appointment *──1 Customer / Service / User?
+Business 1 ──* Invitation      Invitation *──1 User?  (nullable invitedBy)
 ```
 
-| Entity       | Table           | Soft delete       | Notes                                                                                                         |
-| ------------ | --------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| Business     | `businesses`    | ✔                 | Root tenant. `workingHours` is JSON.                                                                          |
-| User         | `users`         | ✖ (`isActive`)    | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`. |
-| Service      | `services`      | ✔                 | `durationMinutes` drives appointment end times.                                                               |
-| Customer     | `customers`     | ✔                 | Unique per business phone: `@@unique([businessId, phone])`.                                                   |
-| Conversation | `conversations` | ✔                 | One active thread per customer flow.                                                                          |
-| Message      | `messages`      | ✖ (immutable log) | Append-only; deleted with its conversation (cascade).                                                         |
-| Appointment  | `appointments`  | ✔                 | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                         |
+| Entity       | Table           | Soft delete           | Notes                                                                                                                                                                                       |
+| ------------ | --------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business     | `businesses`    | ✔                     | Root tenant. `workingHours` is JSON.                                                                                                                                                        |
+| User         | `users`         | ✖ (`isActive`)        | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`.                                                                               |
+| Service      | `services`      | ✔                     | `durationMinutes` drives appointment end times.                                                                                                                                             |
+| Customer     | `customers`     | ✔                     | Unique per business phone: `@@unique([businessId, phone])`.                                                                                                                                 |
+| Conversation | `conversations` | ✔                     | One active thread per customer flow.                                                                                                                                                        |
+| Message      | `messages`      | ✖ (immutable log)     | Append-only; deleted with its conversation (cascade).                                                                                                                                       |
+| Appointment  | `appointments`  | ✔                     | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                                                                                                       |
+| Invitation   | `invitations`   | ✖ (derived lifecycle) | Domain concept separate from Better Auth (DECISIONS #22). Only the token **hash** is stored (unique). Lifecycle from `acceptedAt`/`revokedAt`/`expiresAt` — no status enum, no `deletedAt`. |
 
 ## Enums
 
-- **UserRole** — `ADMIN`, `STAFF`
+- **UserRole** — `ADMIN`, `STAFF` (also the Invitation role — Business
+  roles only; no platform role exists)
 - **ConversationStatus** — `AI_ACTIVE`, `NEED_HUMAN`, `BOOKED`, `INCOMPLETE`
 - **MessageSenderType** — `CUSTOMER`, `AI`, `STAFF`
 - **AppointmentStatus** — `PENDING`, `CONFIRMED`, `CANCELLED`, `NO_SHOW`, `COMPLETED`
@@ -39,6 +42,9 @@ Practical indexes on every foreign key plus:
 - `appointments(status)`, `appointments(businessId, date)`
 - `messages(conversationId, createdAt)`
 - `services(businessId, isActive)`
+- `invitations(tokenHash)` (unique), `invitations(businessId)`,
+  `invitations(businessId, email)` — no `expiresAt`/`invitedById` indexes
+  yet (no query patterns; add when operations demand them)
 
 ## Soft Delete Policy
 
@@ -46,6 +52,78 @@ Reads always filter `deletedAt: null` (enforced inside repositories).
 Deletes set `deletedAt` (and usually `isActive: false`). Restore clears the
 flag. Messages are immutable and cascade with their conversation.
 Hard deletes happen only via DB cascades from a parent row.
+
+## Target Authorization / Invitation Model
+
+> Locked conceptually in Prompt 09 (Auth & User Management Architecture
+> Alignment; `DECISIONS.md` #22). Split status: the **Invitation data
+> model is IMPLEMENTED** (Prompt 10 — see below); everything else in
+> this section is **"Planned / next implementation step"** — no Prisma
+> fields, tables, enums, or migrations exist for those parts yet.
+
+### CURRENT IMPLEMENTED — Invitation model (Prompt 10)
+
+Table `invitations` (migration `20260902120000_invitation_model`):
+
+- `id` UUID PK, `createdAt`/`updatedAt`
+- `email` TEXT — the invited address (NOT unique: the same email may be
+  invited by different Businesses, and re-invited after expiry/revocation)
+- `business_id` FK → `businesses` (`ON DELETE CASCADE`) — tenant scope
+- `role` `UserRole` — reuses the Business role system (`ADMIN`/`STAFF`)
+- `token_hash` TEXT **unique** — secure hash of the invitation token;
+  the raw token is NEVER stored
+- `expires_at`, nullable `accepted_at`, nullable `revoked_at`
+- nullable `invited_by_id` FK → `users` (`ON DELETE SET NULL`) —
+  nullable because a required relation would block future
+  platform-level provisioning (Platform Operator is not a Business
+  User; DECISIONS #22)
+
+Indexes: unique `invitations(token_hash)`, `invitations(business_id)`,
+`invitations(business_id, email)`.
+
+Lifecycle representation — **derived, no persisted status enum and no
+`deletedAt`**:
+
+- Pending: `acceptedAt` null AND `revokedAt` null AND `expiresAt` future
+- Accepted: `acceptedAt` set
+- Revoked: `revokedAt` set
+- Expired: pending AND `expiresAt` past
+
+### PLANNED (not yet implemented — do not assume these exist)
+
+- Token generation + delivery (raw token exists only transiently; the
+  DB keeps the hash)
+- Invitation creation workflow (duplicate-open-invitation prevention,
+  expiry policy — no DB-level uniqueness on `(businessId, email)`)
+- Invitation acceptance workflow (incl. expiry enforcement)
+- ADMIN activation / STAFF activation (password setup)
+- Platform Operator identity / platform-level authorization marker
+
+### Target conceptual account model (planned)
+
+| Account        | accountType | businessId   | Business role |
+| -------------- | ----------- | ------------ | ------------- |
+| PLATFORM USER  | `PLATFORM`  | `null`       | `null`        |
+| BUSINESS ADMIN | `BUSINESS`  | `<business>` | `ADMIN`       |
+| BUSINESS STAFF | `BUSINESS`  | `<business>` | `STAFF`       |
+
+- The `User` remains the authentication identity (Better Auth) with an
+  account scope/type, an optional business association, a business role
+  where applicable, and an active/inactive state.
+- `UserRole` stays `ADMIN` / `STAFF` — Business roles only. The Platform
+  Operator is NOT a `UserRole` value and is not a Business User.
+- Platform access uses an explicit platform-level authorization marker — it
+  must NEVER be inferred from `businessId = null`.
+
+### Target lifecycles (conceptual)
+
+- **Business:** `PROVISIONED → ACTIVE → DEACTIVATED` — planned (no such
+  states on `businesses` yet)
+- **Invitation:** `PENDING → ACCEPTED / EXPIRED / REVOKED` — the data
+  representation is implemented (derived, above); the workflows driving
+  the transitions are planned
+- **Business User:** `INVITED → ACTIVE → DEACTIVATED` (an ACTIVE user may
+  return to ACTIVE after reactivation) — planned
 
 ## Validation Layer (`src/lib/validation`)
 
@@ -81,6 +159,12 @@ Highlights:
   to Prisma `@db.Date`/`@db.Time` values internally.
 - `UserRepository.assignToBusiness` — links an authenticated user during
   onboarding (defaults to `ADMIN`).
+- `InvitationRepository` — data primitives only (DECISIONS #22):
+  `create`, `findByTokenHash`, `findByIdWithinBusiness`,
+  `listByBusiness` (tenant-scoped; no global list), and guarded
+  `revoke` / `markAccepted` (only while pending — expiry validation
+  belongs to the future acceptance workflow). No `deletedAt` filter:
+  the entity has no soft delete.
 
 ## Seeding
 

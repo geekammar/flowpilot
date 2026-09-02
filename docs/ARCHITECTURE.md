@@ -1,7 +1,7 @@
 # FlowPilot — Architecture
 
 > Technical architecture reference. Read together with `SPEC_A.md` and
-> `BUILD_STATE.md`. Last updated: Prompt 03.
+> `BUILD_STATE.md`. Last updated: Prompt 09 (auth model alignment).
 
 ## Stack
 
@@ -71,6 +71,79 @@ prisma/                     # schema.prisma + seed.ts
 5. No circular dependencies. Shared logic is promoted to `@/lib` or
    `@/server` deliberately and stays small.
 6. No giant barrels or mega-utils.
+
+## Authentication & Authorization Model
+
+> Locked in Prompt 09 (Auth & User Management Architecture Alignment).
+> Binding decision: `DECISIONS.md` #22. Target model — implementation is a
+> separate, explicitly-scoped prompt.
+
+**One authentication system.** Better Auth is the single authentication
+layer for ALL human users — Platform Operators, Business ADMINs, and
+Business STAFF. Authentication answers "Who are you?"; authorization answers
+"What are you allowed to access?". There is no separate authentication
+system for platform users, business users, or staff, and no second auth
+provider.
+
+**Two authorization scopes.**
+
+1. **PLATFORM** — platform-level access (Platform Operator / Founder).
+2. **BUSINESS** — access scoped to one Business tenant.
+
+Platform-level access is NOT a Business role. The Platform Operator
+(Founder / Super User) is a platform-level identity, NOT a Business User,
+and MUST NOT be represented by `UserRole.ADMIN` or `UserRole.STAFF`. The
+Founder Side UI remains outside Spec A and belongs conceptually to the
+future Spec B Founder Side.
+
+**Business roles remain `ADMIN` and `STAFF` only** (DECISIONS #02):
+
+- `ADMIN` — controls Business settings, services, knowledge, team,
+  conversations, appointments, customers. Invites STAFF.
+- `STAFF` — works operationally inside the Business: handles
+  assigned/allowed conversations, works appointments; does not manage
+  Business settings or team.
+
+**Invitation-first account creation (current pilot stage).** The primary
+account-creation flow is:
+
+```
+Platform Operator
+  → provision Business
+  → invite initial ADMIN
+  → ADMIN accepts invitation
+  → ADMIN sets password / activates account
+  → ADMIN completes Business onboarding
+  → Business becomes operational
+  → ADMIN invites STAFF
+  → STAFF accepts + activates
+```
+
+There is NO approval workflow — the Platform Operator already decided by
+provisioning the Business/Pilot. **Invitation is a FlowPilot domain
+concept** (own model and lifecycle, documented in `DATABASE.md`) — it is NOT
+a replacement for Better Auth and NOT part of its configuration. Public
+self-sign-up is NOT the primary flow for the current pilot stage, but the
+architecture must not prevent enabling it later as a separate
+acquisition/provisioning mode after PMF.
+
+**Tenancy & authorization rules (non-negotiable):**
+
+1. Business data remains tenant-scoped by `businessId`.
+2. Business ADMIN/STAFF may access only their Business.
+3. UI visibility is NOT an authorization mechanism.
+4. Server-side authorization is mandatory.
+5. Repositories remain the only Prisma consumers.
+6. Platform access must never be inferred simply from `businessId = null`.
+7. Platform access must use an explicit platform-level authorization marker.
+8. Do NOT introduce a general-purpose RBAC engine.
+9. Do NOT introduce granular permissions in Spec A.
+10. Do NOT introduce organizations/membership frameworks unless later
+    evidence requires them.
+
+Target conceptual account model, Invitation model, and lifecycles:
+`DATABASE.md → Target Authorization / Invitation Model` (planned, not yet
+implemented).
 
 ## Database Philosophy
 

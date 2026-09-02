@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: Ops 06 (Pilot Distribution System).
+> Last updated: Prompt 10 (Invitation Data Model).
 
 ## Prompt 01 — Repository Foundation
 
@@ -840,14 +840,171 @@ CLIENT_DEMO,DEPLOYMENT_STATUS,PILOT_DISTRIBUTION_REPORT}.md`; rewritten
 
 ---
 
+## Prompt 09 — Auth & User Management Architecture Alignment
+
+**Status:** ✅ Complete (documentation-only)
+
+> Operator-requested architecture alignment: lock the new authentication /
+> user-management model BEFORE any implementation. No application feature
+> code, schema, migration, or Better Auth configuration changed in this
+> prompt. Binding decision: `DECISIONS.md` #22.
+
+### Completed Work
+
+Documented (nothing implemented in code):
+
+- Invitation-first pilot account creation: Platform Operator provisions
+  Business → invites initial ADMIN → ADMIN accepts invitation → sets
+  password / activates → completes Business onboarding → Business becomes
+  operational → ADMIN invites STAFF → STAFF activates. No approval
+  workflow.
+- Platform vs Business authorization scope separation: ONE Better Auth
+  authentication system for all human users; PLATFORM and BUSINESS are
+  authorization scopes, not auth systems; platform access uses an explicit
+  platform-level marker (never inferred from `businessId = null`).
+- ADMIN/STAFF business roles reaffirmed — no SUPER_ADMIN, SUPERUSER,
+  OWNER_ADMIN, MANAGER, RECEPTIONIST, or any other Business role.
+- Platform Operator (Founder) is a platform-level identity, NOT a Business
+  User and not a `UserRole` value; Founder Side UI remains Spec B.
+- Future self-sign-up compatibility: public self-sign-up is not the primary
+  pilot flow but must remain architecturally possible after PMF.
+- Invitation domain concept (separate from Better Auth) + lifecycle
+  (`PENDING → ACCEPTED / EXPIRED / REVOKED`).
+- Account lifecycle (`INVITED → ACTIVE → DEACTIVATED`) and Business
+  lifecycle (`PROVISIONED → ACTIVE → DEACTIVATED`).
+- Tenancy & authorization rules (server-side authorization mandatory; UI
+  visibility is not authorization; no RBAC engine; no granular permissions;
+  no organizations/membership frameworks).
+- Target conceptual account model (PLATFORM USER / BUSINESS ADMIN /
+  BUSINESS STAFF) documented in `DATABASE.md` — planned, not implemented.
+
+### Files Changed (docs only)
+
+`docs/DECISIONS.md` (#22), `docs/SPEC_A.md` (login/onboarding wording +
+screen list), `docs/ARCHITECTURE.md` (new Authentication & Authorization
+Model section), `docs/DATABASE.md` (target model, labeled planned),
+`docs/PRODUCT_GLOSSARY.md` (Platform Operator / Invitation / Account
+Activation / Business Activation), `docs/AGENT_RULES.md` (strengthened
+prompt lifecycle; sign-up superseded note), `docs/
+FLOWPILOT_UX_IMPROVEMENTS_14.md` (created — did not exist before; UX plan
+with invitation-first framing + P0/P1/P2 priorities), `docs/CURRENT_STATE.md`,
+`docs/PROJECT_STATUS.md`, superseded-notes in `docs/
+PILOT_DISTRIBUTION_REPORT.md` + `docs/RELEASE_REPORT.md`, this file.
+
+No application feature code changed.
+
+### Verification
+
+- Prettier format check on all changed docs ✅
+- `pnpm verify` (lint/typecheck/format/build) ✅ — no source modified; run
+  per AGENT_RULES quality gate
+- Doc consistency: no doc still names public sign-up as the primary flow or
+  next step ✅
+
+### Known Issues
+
+- The previously planned "Prompt 09 — complete Arabic Better Auth sign-up
+  flow" is OBSOLETE (superseded by this architecture alignment). The
+  `/sign-up` placeholder page still exists in code untouched.
+- Nothing of the new model exists in code: no Invitation model, no account
+  activation, no Platform Operator identity, no Team invitation UI.
+
+---
+
+## Prompt 10 — Invitation Data Model (Operator Prompt 02)
+
+**Status:** ✅ Complete
+
+> Data-layer only: the Invitation domain foundation per DECISIONS #22.
+> No UI, no Better Auth changes, no workflows, no activation. Numbering:
+> the operator's FlowPilot prompt series restarted at Prompt 01 (= the
+> auth alignment logged above as internal Prompt 09); this is operator
+> Prompt 02, logged here as internal Prompt 10 to keep the ledger
+> unambiguous.
+
+### Completed Work
+
+- Prisma `Invitation` model (`prisma/schema.prisma`): `id` (UUID),
+  `email`, `businessId` (FK → Business, Cascade), `role` (reuses
+  `UserRole` — ADMIN/STAFF only, DECISIONS #02), `tokenHash` (unique —
+  secure hash only, raw tokens are never stored), `expiresAt`,
+  `acceptedAt?`, `revokedAt?`, `invitedById?` (FK → User, SetNull),
+  `createdAt`, `updatedAt`.
+- `invitedById` is nullable: the minimum safe choice until the Platform
+  Operator identity exists (a required relation would block future
+  platform-level provisioning; DECISIONS #22).
+- Derived lifecycle — NO persisted status enum and NO `deletedAt`:
+  pending = acceptedAt/revokedAt null + unexpired; accepted = acceptedAt
+  set; revoked = revokedAt set; expired = pending + past expiresAt.
+- Indexes: `(businessId)`, `(businessId, email)` (convention: FK +
+  per-tenant lookup), unique `token_hash` (efficient + unique lookup).
+  No speculative indexes (`expiresAt`, `invitedById` have no query
+  patterns yet).
+- Migration `20260902120000_invitation_model` — SQL authored on-device
+  in Prisma's migration style (the schema-engine binary cannot execute
+  on Termux, so `prisma migrate dev`/`diff` cannot run here); apply from
+  desktop/CI with `pnpm db:deploy`.
+- Zod validation (`src/lib/validation/invitation.ts`):
+  `CreateInvitationDto` — repository input contract only (email,
+  businessId, role, tokenHash 32–256, `expiresAt: z.date()`,
+  optional `invitedById`). No HTTP request DTOs (later prompts).
+- `InvitationRepository` (`src/server/repositories/invitation.repository.ts`):
+  `create`, `findByTokenHash` (single record, for the future acceptance
+  flow), `findByIdWithinBusiness`, `listByBusiness` (tenant-scoped,
+  newest first, paginated), and `revoke` / `markAccepted` as guarded
+  state-update primitives (only while pending; transaction-scoped
+  find-then-update like the appointment conventions). Expiry validation
+  intentionally belongs to the future acceptance workflow. NO global
+  "list all invitations" method (tenancy, DECISIONS #22).
+- Domain type: `Invitation` alias exported from `src/types/domain.ts`.
+- Prisma client regenerated (`pnpm db:generate`) — output stays
+  gitignored under `src/generated/prisma`.
+
+### Generated Files
+
+`prisma/migrations/20260902120000_invitation_model/migration.sql`,
+`src/lib/validation/invitation.ts`,
+`src/server/repositories/invitation.repository.ts`; updated
+`prisma/schema.prisma` (Invitation model + relations on Business/User),
+`src/lib/validation/index.ts`, `src/server/repositories/index.ts`,
+`src/types/domain.ts`.
+
+### Verification
+
+- `pnpm db:generate` ✅ (schema valid, client regenerated)
+- `pnpm typecheck` ✅ · `pnpm lint` ✅
+- `pnpm verify` (full gate: lint/typecheck/format/build --webpack) ✅
+- `pnpm security` ✅ (token-related fields scanned — clean)
+- Migration NOT applied on-device (Termux schema-engine limitation +
+  placeholder `DATABASE_URL`) — apply from desktop/CI: `pnpm db:deploy`.
+  Not claimed as applied.
+
+### Known Limitations
+
+- No workflow logic exists yet: token generation/delivery, invitation
+  creation workflow, acceptance, account activation, password setup,
+  and all UI belong to later prompts.
+- No DB-level duplicate-open-invitation constraint (the same email may
+  hold several invitations, including across Businesses by design);
+  duplicate-open-invitation prevention is the creation workflow's
+  responsibility (next prompt).
+- `prisma/migrations/` has no `migration_lock.toml` and no init
+  migration (pre-existing state, affects the onboarding migration
+  equally) — reported as an out-of-scope observation, not fixed here.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
   Conversations, Appointments, and a full polish pass (loading/error/
   empty states, a11y, PWA PNG icons, demo-ready seed) are complete.
-  Still placeholders: auth sign-up, Customers directory, Services
-  management, Business settings/knowledge screens, Team management
-  (admin), and the Staff area.
+  Still placeholders: Customers directory, Services management, Business
+  settings/knowledge screens, Team management (admin), and the Staff area.
+  (The `/sign-up` placeholder page remains in code but is no longer a
+  planned deliverable — superseded by the invitation-first model; the
+  invitation data foundation now exists, but the invitation workflow and
+  account activation are not yet implemented.)
 - **Ops 01 (DX pass) complete:** cross-platform bootstrap/dev scripts,
   `pnpm run setup` / `pnpm run doctor` / `pnpm verify`, safe `.env.local`
   automation, unified env precedence, per-OS setup docs — see
@@ -886,8 +1043,17 @@ CLIENT_DEMO,DEPLOYMENT_STATUS,PILOT_DISTRIBUTION_REPORT}.md`; rewritten
   Distribution: READY (code side)** — remaining steps are user actions
   (vercel login/link, Vercel env vars, `pnpm db:deploy`) — see
   `docs/VERCEL_QUICK_DEPLOY.md`.
-- **Next Step:** Prompt 09 — complete the Arabic Better Auth sign-up
-  flow, then continue with the next requested Spec A operational screen
-  (recommended order: Customers directory → Staff area → Services →
-  Settings → Team).
+- **Auth architecture alignment (Prompt 09) complete:** invitation-first
+  pilot account creation, PLATFORM vs BUSINESS authorization scopes,
+  ADMIN/STAFF business roles reaffirmed, Platform Operator is not a
+  Business role, Invitation + account + Business lifecycles documented as the
+  TARGET model (`DECISIONS.md` #22, `ARCHITECTURE.md`, `DATABASE.md`).
+- **Invitation data foundation (Prompt 10 / operator Prompt 02)
+  complete:** `Invitation` Prisma model + migration + repository +
+  validation + domain type implemented. Data primitives only — no token
+  generation, no workflows, no UI, no activation, no auth changes.
+- **Next Step:** Prompt 03 — Invitation Creation Foundation (operator
+  FlowPilot series; continues as internal ledger Prompt 11): token
+  generation (hash-only storage) + invitation create/list/revoke
+  operations only. Do NOT combine creation + acceptance + activation.
 - After each prompt: update this file and `DECISIONS.md`.

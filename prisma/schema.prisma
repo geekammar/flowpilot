@@ -67,6 +67,7 @@ model Business {
   customers     Customer[]
   conversations Conversation[]
   appointments  Appointment[]
+  invitations   Invitation[]
 
   @@index([isActive])
   @@map("businesses")
@@ -186,6 +187,38 @@ model Appointment {
   @@map("appointments")
 }
 
+// ─── Invitations ─────────────────────────────────────────────
+// FlowPilot domain concept (DECISIONS #22): an email invited to join
+// one Business with a Business role. NOT a Better Auth record and NOT
+// a replacement for it. Only the token HASH is stored — raw tokens are
+// never persisted. Lifecycle is derived from timestamps (no status
+// enum, no deletedAt): pending = acceptedAt/revokedAt null + unexpired;
+// accepted = acceptedAt set; revoked = revokedAt set; expired = pending
+// + expiresAt in the past.
+
+model Invitation {
+  id          String    @id @default(uuid())
+  email       String
+  businessId  String    @map("business_id")
+  role        UserRole
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // Nullable: until the Platform Operator identity exists, a required
+  // relation would block future platform-level provisioning.
+  invitedById String?   @map("invited_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy User?    @relation("InvitationCreator", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([businessId, email])
+  @@map("invitations")
+}
+
 // ─── Users & auth ────────────────────────────────────────────
 // The Better Auth required fields stay untouched; domain fields
 // (business, role) extend the same `users` table.
@@ -208,6 +241,7 @@ model User {
   accounts              Account[]
   assignedConversations Conversation[] @relation("ConversationAssignee")
   assignedAppointments  Appointment[]  @relation("AppointmentAssignee")
+  invitationsCreated    Invitation[]  @relation("InvitationCreator")
 
   @@index([businessId])
   @@map("users")

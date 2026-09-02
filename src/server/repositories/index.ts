@@ -13,6 +13,7 @@ import { AppointmentRepository } from "./appointment.repository";
 import { BusinessRepository } from "./business.repository";
 import { ConversationRepository } from "./conversation.repository";
 import { CustomerRepository } from "./customer.repository";
+import { InvitationRepository } from "./invitation.repository";
 import { ServiceRepository } from "./service.repository";
 import { UserRepository } from "./user.repository";
 
@@ -22,12 +23,14 @@ export const serviceRepository = new ServiceRepository();
 export const customerRepository = new CustomerRepository();
 export const conversationRepository = new ConversationRepository();
 export const appointmentRepository = new AppointmentRepository();
+export const invitationRepository = new InvitationRepository();
 
 export {
   AppointmentRepository,
   BusinessRepository,
   ConversationRepository,
   CustomerRepository,
+  InvitationRepository,
   ServiceRepository,
   UserRepository,
 };

@@ -76,8 +76,9 @@ pnpm release          # gates → commit "feat: initial pilot-ready release"
 ## Next Steps
 
 1. User: `gh auth login` + set `DATABASE_URL` → run `pnpm release`.
-2. Continue Spec A: Prompt 09 (Arabic sign-up) → customers → staff → services
-   → settings → team (`BUILD_STATE.md → Next Step`).
+2. Continue Spec A: ~~Prompt 09 (Arabic sign-up)~~ SUPERSEDED (Prompt 09
+   auth alignment): invitation/account lifecycle foundation → customers →
+   staff → services → settings → team (`BUILD_STATE.md → Next Step`).
 3. After Spec A exit criteria: bump to `v0.2.0` and start Spec B planning.
 4. Consider CI + branch protection when a second contributor arrives
    (`GITHUB_WORKFLOW.md` → future section).

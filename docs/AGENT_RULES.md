@@ -3,7 +3,7 @@
 > Binding rules for every AI agent (and human contributor) working on
 > FlowPilot. Ignorance of these rules is not an excuse; they exist so that any
 > agent can continue the project safely after all context is lost.
-> Last updated: Prompt 03.
+> Last updated: Prompt 09 (auth model alignment).
 
 ## Before Making Any Changes
 
@@ -17,7 +17,11 @@ Read, in order:
 6. `docs/DECISIONS.md` — accepted decisions (binding)
 7. `docs/BUILD_STATE.md` — what exists and what is next
 
-Then read `docs/BUILD_STATE.md → Next Step` and do exactly that.
+Then read `docs/BUILD_STATE.md → Next Step` and do exactly that. Caution:
+older docs may contain obsolete instructions (e.g., building public
+self-sign-up — superseded in Prompt 09 by the invitation-first model,
+DECISIONS #22). `DECISIONS.md` and `BUILD_STATE.md` win over any older
+wording; if a conflict is unclear, escalate instead of guessing.
 
 ## NEVER
 
@@ -50,14 +54,20 @@ pnpm build` must pass before finishing a prompt
 
 Every future prompt/session MUST follow this lightweight process:
 
-1. **Read memory files first** (the 7 files listed above).
-2. **Plan** against `BUILD_STATE.md → Next Step`; never rebuild completed work.
-3. **Implement** within scope, following `ARCHITECTURE.md` dependency rules.
-4. **Verify** with the full quality gate command list.
-5. **Update `BUILD_STATE.md`** (new prompt section + refreshed "Next Step").
-6. **Update `DECISIONS.md`** if any decision was made — append only, never
-   overwrite historical decisions.
-7. Leave the repository in a state where the next agent can continue by
+1. **Read memory files first** (the 7 files listed above), then
+   `BUILD_STATE.md` and any feature docs relevant to the current prompt.
+2. **Inspect the current implementation** before changing anything.
+3. **Plan** against `BUILD_STATE.md → Next Step`; never rebuild completed
+   work. Produce a concise plan and a TODO list before editing.
+4. **Implement** ONLY the current prompt's scope, following
+   `ARCHITECTURE.md` dependency rules.
+5. **Verify** with the full quality gate command list.
+6. **Update the docs** — `BUILD_STATE.md` always (new prompt section +
+   refreshed "Next Step"); `DECISIONS.md` when a decision was made (append
+   only, never overwrite historical decisions).
+7. **Report the final status honestly** — distinguish what was BUILT in
+   code from what was only DOCUMENTED or NOT built.
+8. Leave the repository in a state where the next agent can continue by
    reading memory files alone.
 
 ## Escalation Path

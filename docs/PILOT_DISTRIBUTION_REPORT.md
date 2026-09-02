@@ -129,8 +129,9 @@ instructions, never silent failures.
 2. **Operator:** publish v0.1.0 (`pnpm release` — `gh` already authenticated;
    only the `DATABASE_URL` doctor gate remains) so the GitHub→Vercel
    auto-redeploy loop is active.
-3. **Product (next agent):** resume Prompt 09 (Arabic sign-up flow), then
-   customers → staff → services → settings → team — unchanged product next
-   step per `BUILD_STATE.md`.
+3. **Product (next agent):** ~~resume Prompt 09 (Arabic sign-up flow)~~
+   SUPERSEDED (Prompt 09 auth alignment): next is the invitation/account
+   lifecycle foundation, then customers → staff → services → settings →
+   team — see `BUILD_STATE.md → Next Step`.
 4. **Later (Spec B era, needs a decision):** per-prospect preview databases
    via Neon branching; CI pipeline running the encoded gate.

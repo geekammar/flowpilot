@@ -1,0 +1,89 @@
+import type { Invitation } from "@/generated/prisma/client";
+
+import type { CreateInvitationDto } from "@/lib/validation";
+import { paginationSchema, paginationToSkipTake } from "@/lib/validation";
+import { db } from "@/server/db";
+
+/**
+ * Invitation — FlowPilot domain concept (DECISIONS #22), separate from
+ * Better Auth. Data primitives only: token generation/delivery,
+ * acceptance, account activation, and password setup are later prompts.
+ *
+ * Conventions specific to this entity:
+ * - Only the token HASH is stored; the raw token never reaches the DB.
+ * - Lifecycle is derived (acceptedAt/revokedAt/expiresAt) — there is no
+ *   persisted status enum and no deletedAt, so no `deletedAt: null`
+ *   filter applies here.
+ * - Tenant-scoped by businessId: no global "list all" method exists.
+ *   Platform-level access is handled in a later prompt.
+ */
+export class InvitationRepository {
+  async create(data: CreateInvitationDto): Promise<Invitation> {
+    return db.invitation.create({ data });
+  }
+
+  /** Single-record token-hash lookup for the future acceptance flow. */
+  async findByTokenHash(tokenHash: string): Promise<Invitation | null> {
+    return db.invitation.findUnique({ where: { tokenHash } });
+  }
+
+  async findByIdWithinBusiness(
+    id: string,
+    businessId: string,
+  ): Promise<Invitation | null> {
+    return db.invitation.findFirst({ where: { id, businessId } });
+  }
+
+  async listByBusiness(
+    businessId: string,
+    rawPagination?: unknown,
+  ): Promise<Invitation[]> {
+    const pagination = paginationSchema.parse(rawPagination ?? {});
+    return db.invitation.findMany({
+      where: { businessId },
+      orderBy: [{ createdAt: "desc" }],
+      ...paginationToSkipTake(pagination),
+    });
+  }
+
+  /**
+   * Revokes a still-pending invitation (acceptedAt/revokedAt null).
+   * Returns null when not found, out of the business, or no longer
+   * pending. Expiry is irrelevant to revocation.
+   */
+  async revoke(id: string, businessId: string): Promise<Invitation | null> {
+    return db.$transaction(async (tx) => {
+      const invitation = await tx.invitation.findFirst({
+        where: { id, businessId, acceptedAt: null, revokedAt: null },
+      });
+      if (!invitation) return null;
+      return tx.invitation.update({
+        where: { id },
+        data: { revokedAt: new Date() },
+      });
+    });
+  }
+
+  /**
+   * Marks a still-pending invitation accepted (acceptedAt/revokedAt
+   * null). Returns null when not found, out of the business, or no
+   * longer pending. Expiry validation belongs to the acceptance
+   * workflow (later prompt), which resolves the invitation via
+   * findByTokenHash first.
+   */
+  async markAccepted(
+    id: string,
+    businessId: string,
+  ): Promise<Invitation | null> {
+    return db.$transaction(async (tx) => {
+      const invitation = await tx.invitation.findFirst({
+        where: { id, businessId, acceptedAt: null, revokedAt: null },
+      });
+      if (!invitation) return null;
+      return tx.invitation.update({
+        where: { id },
+        data: { acceptedAt: new Date() },
+      });
+    });
+  }
+}

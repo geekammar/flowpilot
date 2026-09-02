@@ -5,3 +5,4 @@ export * from "./customer";
 export * from "./conversation";
 export * from "./appointment";
 export * from "./user";
+export * from "./invitation";
