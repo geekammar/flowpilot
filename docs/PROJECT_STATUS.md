@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-02 (after Prompt 10 —
-> Invitation Data Model).
+> Point-in-time status snapshot. Date: 2026-09-02 (after PROMPT-03 —
+> Invitation Creation Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -25,22 +25,25 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | UX/A11y/PWA polish pass                                  | ✅ complete                            |
 | Auth architecture alignment (docs)                       | ✅ complete (Prompt 09, DECISIONS #22) |
 | Invitation data model (schema/migration/repo/validation) | ✅ complete (Prompt 10)                |
-| Invitation creation workflow                             | ⏳ not started (Prompt 03 — next)      |
-| Invitation acceptance / account activation               | ⏳ not started                         |
+| Invitation creation foundation (service layer)           | ✅ complete (PROMPT-03)                |
+| Invitation acceptance / account activation               | ⏳ not started (next)                  |
 | Customers directory                                      | ⏳ placeholder                         |
 | Services management                                      | ⏳ placeholder                         |
 | Business settings / knowledge screens                    | ⏳ placeholder                         |
 | Team management (admin)                                  | ⏳ placeholder                         |
 | Staff area                                               | ⏳ placeholder                         |
 
-Auth note (Prompts 09–10): account creation for the pilot stage is
-invitation-first — the Platform Operator provisions the Business and invites
-the initial ADMIN; public self-sign-up is NOT the primary pilot flow (future
-self-serve mode remains architecturally possible). The `/sign-up` placeholder
-page remains in code but is no longer a planned deliverable. The Invitation
-DATA foundation is implemented (model, migration, repository, validation);
-token generation, the creation workflow, acceptance, activation, and all
-invitation UI are not yet implemented.
+Auth note (Prompts 09–10 + PROMPT-03): account creation for the pilot
+stage is invitation-first — the Platform Operator provisions the Business
+and invites the initial ADMIN; public self-sign-up is NOT the primary
+pilot flow (future self-serve mode remains architecturally possible).
+The `/sign-up` placeholder page remains in code but is no longer a
+planned deliverable. The Invitation DATA foundation (model, migration,
+repository, validation) AND the creation foundation (secure token
+generation with hash-only persistence, 7-day expiry, duplicate-open
+prevention, business-scoped create/list/revoke service operations) are
+implemented; acceptance, activation, token delivery, and all invitation
+UI are not yet implemented.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -118,9 +121,9 @@ on-device (→ migrate from desktop/CI).
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: invitation creation foundation
-(Prompt 03) → invitation acceptance/activation → customers → staff area →
-services → settings → team). Spec A exit criteria live in `ROADMAP.md`.
+**Finish Spec A first** (recommended order: invitation acceptance /
+activation (next) → customers → staff area → services → settings →
+team). Spec A exit criteria live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

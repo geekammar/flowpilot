@@ -22,6 +22,32 @@ export class InvitationRepository {
     return db.invitation.create({ data });
   }
 
+  /**
+   * Creates an invitation unless an OPEN one already exists for the same
+   * Business + email (open = not accepted, not revoked, unexpired).
+   * Returns null when an open invitation exists — the creation workflow
+   * maps that to its conflict error. Transaction-scoped check-then-create
+   * (same pattern as AppointmentRepository.createWithConflictCheck).
+   * Expired, revoked, and accepted invitations never block creation.
+   */
+  async createIfNoOpenInvitation(
+    data: CreateInvitationDto,
+  ): Promise<Invitation | null> {
+    return db.$transaction(async (tx) => {
+      const open = await tx.invitation.findFirst({
+        where: {
+          businessId: data.businessId,
+          email: data.email,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (open) return null;
+      return tx.invitation.create({ data });
+    });
+  }
+
   /** Single-record token-hash lookup for the future acceptance flow. */
   async findByTokenHash(tokenHash: string): Promise<Invitation | null> {
     return db.invitation.findUnique({ where: { tokenHash } });

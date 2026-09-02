@@ -15,15 +15,61 @@
 #   - create GitHub Release "FlowPilot v0.1.0 — Initial Pilot-Ready Core"
 #
 # Usage:
-#   pnpm release            # default: repo name "flowpilot", tag v0.1.0
-#   bash scripts/release.sh [repo-name] [tag]
+#   pnpm release                                        # default: repo "flowpilot", tag v0.1.0
+#   bash scripts/release.sh [repo-name] [tag] [notes-file]
+#
+# [notes-file] (optional, for per-feature releases after v0.1.0): a
+# Markdown file whose FIRST LINE is the release subject (e.g.
+# "Invitation Creation Foundation") — the script composes the title
+# "FlowPilot <tag> — <subject>" for both the annotated tag and the
+# GitHub Release; the remaining lines become the release notes body.
+# Without it, the original v0.1.0 message/notes are used.
 
 set -euo pipefail
 
 REPO_NAME="${1:-flowpilot}"
 TAG="${2:-v0.1.0}"
+NOTES_FILE="${3:-}"
 COMMIT_MSG="feat: initial pilot-ready release"
 DESCRIPTION="WhatsApp Appointment Conversion System — book more, chase less."
+
+if [ -n "$NOTES_FILE" ]; then
+  [ -f "$NOTES_FILE" ] || { printf '\033[1;31m✗\033[0m notes file not found: %s\n' "$NOTES_FILE" >&2; exit 1; }
+  SUBJECT="$(head -n 1 "$NOTES_FILE")"
+  BODY="$(tail -n +2 "$NOTES_FILE")"
+  RELEASE_TITLE="FlowPilot $TAG — $SUBJECT"
+  TAG_MESSAGE="$RELEASE_TITLE"
+  RELEASE_NOTES="## $RELEASE_TITLE
+
+$BODY"
+else
+  RELEASE_TITLE="FlowPilot $TAG"
+  TAG_MESSAGE="FlowPilot $TAG — Initial Pilot-Ready Core"
+  RELEASE_NOTES="$(cat <<'NOTES'
+## FlowPilot $TAG — Initial Pilot-Ready Core
+
+First release: the Spec A engine for converting WhatsApp conversations into
+confirmed appointments (Arabic-first, RTL, vertical-agnostic, PWA).
+
+### Included
+- Foundation: Next.js 16 + TS strict + Tailwind v4 + shadcn/ui, Better Auth,
+  Prisma 7 / Neon Postgres, feature-based modular monolith
+- Product: onboarding wizard, business admin dashboard, conversations inbox,
+  appointments agenda + detail + creation, optimistic staff replies
+- Polish: loading/error/empty states, a11y pass, PWA PNG icons + service
+  worker, Arabic demo seed (demo credentials in docs/DATABASE.md)
+- Ops: cross-platform bootstrap (Windows/Linux/macOS/Termux), doctor /
+  verify / security tooling, pre-commit secret guard, full docs/
+
+### Known placeholders (Spec A continues)
+Auth sign-up, customers directory, services, settings, team, staff area.
+
+See docs/PROJECT_STATUS.md and docs/BUILD_STATE.md for details.
+NOTES
+)"
+  # Expand $TAG inside the default notes.
+  RELEASE_NOTES="${RELEASE_NOTES//\$TAG/$TAG}"
+fi
 
 log() { printf '\033[1;34m▸\033[0m %s\n' "$*"; }
 ok() { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
@@ -69,7 +115,7 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   ok "Tag $TAG already exists — skipping."
 else
   log "Creating annotated tag $TAG…"
-  git tag -a "$TAG" -m "FlowPilot $TAG — Initial Pilot-Ready Core"
+  git tag -a "$TAG" -m "$TAG_MESSAGE"
 fi
 
 if git remote get-url origin >/dev/null 2>&1; then
@@ -89,29 +135,8 @@ if gh release view "$TAG" >/dev/null 2>&1; then
   ok "Release $TAG already exists — skipping creation."
 else
   gh release create "$TAG" --verify-tag \
-    --title "FlowPilot $TAG" \
-    --notes "$(cat <<EOF
-## FlowPilot $TAG — Initial Pilot-Ready Core
-
-First release: the Spec A engine for converting WhatsApp conversations into
-confirmed appointments (Arabic-first, RTL, vertical-agnostic, PWA).
-
-### Included
-- Foundation: Next.js 16 + TS strict + Tailwind v4 + shadcn/ui, Better Auth,
-  Prisma 7 / Neon Postgres, feature-based modular monolith
-- Product: onboarding wizard, business admin dashboard, conversations inbox,
-  appointments agenda + detail + creation, optimistic staff replies
-- Polish: loading/error/empty states, a11y pass, PWA PNG icons + service
-  worker, Arabic demo seed (demo credentials in docs/DATABASE.md)
-- Ops: cross-platform bootstrap (Windows/Linux/macOS/Termux), doctor /
-  verify / security tooling, pre-commit secret guard, full docs/
-
-### Known placeholders (Spec A continues)
-Auth sign-up, customers directory, services, settings, team, staff area.
-
-See docs/PROJECT_STATUS.md and docs/BUILD_STATE.md for details.
-EOF
-)"
+    --title "$RELEASE_TITLE" \
+    --notes "$RELEASE_NOTES"
 fi
 
 printf '\n'

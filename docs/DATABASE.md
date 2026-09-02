@@ -57,9 +57,11 @@ Hard deletes happen only via DB cascades from a parent row.
 
 > Locked conceptually in Prompt 09 (Auth & User Management Architecture
 > Alignment; `DECISIONS.md` #22). Split status: the **Invitation data
-> model is IMPLEMENTED** (Prompt 10 — see below); everything else in
-> this section is **"Planned / next implementation step"** — no Prisma
-> fields, tables, enums, or migrations exist for those parts yet.
+> model is IMPLEMENTED** (Prompt 10) and the **Invitation creation
+> workflow is IMPLEMENTED** (PROMPT-03) — see the two "CURRENT
+> IMPLEMENTED" subsections below; everything else in this section is
+> **"Planned / next implementation step"** — no Prisma fields, tables,
+> enums, or migrations exist for those parts yet.
 
 ### CURRENT IMPLEMENTED — Invitation model (Prompt 10)
 
@@ -89,14 +91,43 @@ Lifecycle representation — **derived, no persisted status enum and no
 - Revoked: `revokedAt` set
 - Expired: pending AND `expiresAt` past
 
+### CURRENT IMPLEMENTED — Invitation creation workflow (PROMPT-03)
+
+Server/domain foundation on top of the data model (no UI, no
+acceptance, no activation, no delivery):
+
+- **Token security** (`src/server/security/invitation-token.ts`):
+  raw token = 256 bits of CSPRNG, URL-safe base64url; only its SHA-256
+  hex hash is persistable. The raw token is returned from creation
+  exactly once and is never logged (DECISIONS #23).
+- **Expiration policy** (centralized in the invitation service):
+  `expiresAt = creation + 7 days` (`INVITATION_EXPIRY_DAYS`).
+- **Email normalization**: trim + lowercase, defined once in the
+  invitation workflow schema; the same normalized form is used for
+  duplicate detection, persistence, and listing. No DB uniqueness on
+  `(businessId, email)` — prevention lives in the workflow.
+- **Duplicate-open prevention**
+  (`InvitationRepository.createIfNoOpenInvitation`): transaction-scoped
+  check-then-create — a second OPEN invitation (same Business +
+  normalized email, not accepted/revoked/expired) is refused with a
+  typed conflict error. Expired, revoked, and accepted invitations
+  never block a new one. Same accepted race caveat as appointment
+  conflicts (pilot volume).
+- **Business-scoped operations**: `createInvitation` (verifies the
+  Business via the repository first), `listInvitations` (tenant-scoped,
+  newest-first, paginated, derived status, hash excluded), and
+  `revokeInvitation` (accepted → invalid state; already-revoked →
+  idempotent success; pending, including expired-pending → revoked).
+- **Result shape**: typed results with Arabic messages and codes
+  INVALID_INPUT / BUSINESS_NOT_FOUND / INVITATION_ALREADY_OPEN /
+  INVITATION_NOT_FOUND / INVALID_INVITATION_STATE / PERSISTENCE_FAILED;
+  `tokenHash` never leaves the repository layer.
+
 ### PLANNED (not yet implemented — do not assume these exist)
 
-- Token generation + delivery (raw token exists only transiently; the
-  DB keeps the hash)
-- Invitation creation workflow (duplicate-open-invitation prevention,
-  expiry policy — no DB-level uniqueness on `(businessId, email)`)
 - Invitation acceptance workflow (incl. expiry enforcement)
 - ADMIN activation / STAFF activation (password setup)
+- Token delivery (email / WhatsApp link to the invitee)
 - Platform Operator identity / platform-level authorization marker
 
 ### Target conceptual account model (planned)
@@ -159,12 +190,13 @@ Highlights:
   to Prisma `@db.Date`/`@db.Time` values internally.
 - `UserRepository.assignToBusiness` — links an authenticated user during
   onboarding (defaults to `ADMIN`).
-- `InvitationRepository` — data primitives only (DECISIONS #22):
-  `create`, `findByTokenHash`, `findByIdWithinBusiness`,
-  `listByBusiness` (tenant-scoped; no global list), and guarded
-  `revoke` / `markAccepted` (only while pending — expiry validation
-  belongs to the future acceptance workflow). No `deletedAt` filter:
-  the entity has no soft delete.
+- `InvitationRepository` — data primitives + the creation guard
+  (DECISIONS #22): `create`, `createIfNoOpenInvitation` (transactional
+  duplicate-open guard, PROMPT-03), `findByTokenHash`,
+  `findByIdWithinBusiness`, `listByBusiness` (tenant-scoped; no global
+  list), and guarded `revoke` / `markAccepted` (only while pending —
+  expiry validation belongs to the future acceptance workflow). No
+  `deletedAt` filter: the entity has no soft delete.
 
 ## Seeding
 

@@ -2,7 +2,8 @@
 
 > How FlowPilot gets from working tree to a tagged GitHub release. First
 > release: **v0.1.0 — Initial Pilot-Ready Core**. Automated by
-> `scripts/release.sh` (`pnpm release`).
+> `scripts/release.sh` (`pnpm release`). Per-feature releases (v0.2.0+):
+> see "Per-Feature Releases" below.
 
 ## Golden Rules
 
@@ -15,7 +16,7 @@
 
 ```bash
 pnpm release                    # repo "flowpilot", tag v0.1.0
-bash scripts/release.sh [repo] [tag]
+bash scripts/release.sh [repo] [tag] [notes-file]
 ```
 
 The script is safe to re-run (idempotent commit/tag/remote/release steps) and
@@ -49,6 +50,28 @@ real `DATABASE_URL` in `.env.local`.
    `gh repo create flowpilot --private --source=. --remote=origin`
 6. `git push -u origin main` + `git push origin <tag>`
 7. `gh release create <tag> --verify-tag --title "FlowPilot <tag>" --notes …`
+
+## Per-Feature Releases (v0.2.0+)
+
+`scripts/release.sh` accepts an optional third argument — a notes file —
+added in PROMPT-03 as the smallest extension supporting per-feature
+SemVer releases (gates and v0.1.0 defaults are unchanged):
+
+```bash
+# notes file: first line = release subject, remaining lines = notes body
+bash scripts/release.sh flowpilot v0.2.0 release-notes.md
+```
+
+- Composed annotated-tag message and GitHub Release title:
+  `FlowPilot <tag> — <subject>` (e.g.
+  `FlowPilot v0.2.0 — Invitation Creation Foundation`).
+- The notes body becomes the GitHub Release notes.
+- The script's release commit step stays a no-op when the tree is
+  already committed (the normal case: each feature prompt lands its own
+  atomic commit first; only stray changes would be swept into the
+  hardcoded initial-release commit message).
+- Version choice: inspect existing tags first (`git tag`), then bump
+  MINOR for a new feature / PATCH for a fix (pre-1.0).
 
 ## Manual Equivalent (for reference)
 

@@ -2,7 +2,7 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-02 — Prompt 10 (Invitation Data Model).
+> Last updated: 2026-09-02 — PROMPT-03 (Invitation Creation Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -23,10 +23,18 @@ Authentication & Authorization Model`.
   Prisma model (token hash only, derived lifecycle, ADMIN/STAFF role) +
   migration `20260902120000_invitation_model` + repository (tenant-scoped
   data primitives incl. guarded revoke/markAccepted) + Zod
-  `CreateInvitationDto` + domain type. **Invitation workflow: 🟡 not
-  implemented yet** (no token generation, creation flow, acceptance).
-  **Account activation: 🟡 not implemented yet.** **Platform Operator:
-  🟡 architecture documented, implementation pending.**
+  `CreateInvitationDto` + domain type.
+- **Invitation creation foundation: ✅ implemented** (PROMPT-03): secure
+  token generation (256-bit CSPRNG, URL-safe) with SHA-256 hash-only
+  persistence (raw token returned once, never logged), centralized
+  7-day expiry, transactional duplicate-open-invitation prevention
+  (Business + normalized email; expired/revoked/accepted never block),
+  and business-scoped `createInvitation` / `listInvitations` /
+  `revokeInvitation` service operations with typed results — no UI, no
+  acceptance, no activation, no delivery yet. **Invitation acceptance:
+  🟡 not implemented yet.** **Account activation: 🟡 not implemented
+  yet.** **Platform Operator: 🟡 architecture documented, implementation
+  pending.**
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Ops:** bootstrap + dev scripts (Win/Linux/macOS/Termux), doctor/verify/
@@ -53,7 +61,7 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   `pnpm db:deploy` vs Neon, push repo, import) — see `docs/DEPLOYMENT_STATUS.md`.
 - **Release:** v0.1.0 prepared; `gh` is authenticated — publishing blocked on
   a real `DATABASE_URL` only, then `pnpm release` (see `RELEASE_REPORT.md`).
-- **Next step (product):** Prompt 03 — Invitation Creation Foundation
-  (token generation + create/list/revoke operations only), then
-  customers → staff → services → settings → team (`BUILD_STATE.md`).
+- **Next step (product):** Invitation acceptance + account activation
+  (accept a valid pending token, set password via Better Auth, activate)
+  — then customers → staff → services → settings → team (`BUILD_STATE.md`).
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

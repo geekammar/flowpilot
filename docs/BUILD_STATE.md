@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: Prompt 10 (Invitation Data Model).
+> Last updated: PROMPT-03 (Invitation Creation Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -994,6 +994,105 @@ No application feature code changed.
 
 ---
 
+## PROMPT-03 — Invitation Creation Foundation
+
+**Status:** ✅ Complete
+
+> Server/domain foundation only: secure token creation (hash-only
+> persistence), business-scoped listing, and revocation. No UI, no
+> invitation acceptance, no account activation, no token delivery, no
+> Better Auth changes.
+
+### Completed Work
+
+- Secure token utilities (`src/server/security/invitation-token.ts`):
+  256-bit CSPRNG raw token (URL-safe base64url) + deterministic SHA-256
+  hex hash; only the hash is ever persistable. The raw token is returned
+  from creation exactly once and is never logged (no `console` usage in
+  any new module — verified by source scan).
+- `InvitationRepository.createIfNoOpenInvitation` — transaction-scoped
+  check-then-create (same pattern as
+  `AppointmentRepository.createWithConflictCheck`): refuses a second
+  OPEN invitation for the same Business + normalized email; expired,
+  revoked, and accepted invitations never block creation. No DB
+  uniqueness constraint added (the Prompt-10 data-model decision stands).
+- Invitation service
+  (`src/features/invitations/server/invitation-service.ts`):
+  `createInvitation` (validate → normalize email → verify Business via
+  the repository → generate token → persist hash only → return metadata
+  plus the raw token once), `listInvitations` (business-scoped,
+  newest-first, paginated, derived status, hash excluded), and
+  `revokeInvitation` (business-scoped; accepted → invalid state;
+  already-revoked → idempotent success with no second write; pending —
+  including expired-pending — → revoked; acceptance NOT implemented).
+- Centralized expiration policy: `INVITATION_EXPIRY_DAYS = 7` +
+  `invitationExpiresAt()` (`expiresAt = creation + TTL`) — the only
+  place the TTL is defined (DECISIONS #23).
+- Derived-lifecycle helper `deriveInvitationStatus` (PENDING / ACCEPTED
+  / REVOKED / EXPIRED from timestamps; precedence accepted > revoked >
+  expired > pending) — the DATABASE.md lifecycle encoded in one place.
+- Email normalization (trim + lowercase) defined once in the invitation
+  workflow schema and used for duplicate detection, persistence, and
+  listing alike; global email behavior elsewhere untouched.
+- Typed results mirroring `ApiResponse` with tightened error codes
+  (INVALID_INPUT / BUSINESS_NOT_FOUND / INVITATION_ALREADY_OPEN /
+  INVITATION_NOT_FOUND / INVALID_INVITATION_STATE / PERSISTENCE_FAILED),
+  Arabic messages, no internals leaked.
+- Repository collaborators are injectable on the service (defaulting to
+  the app singletons) purely so the workflow logic can be verified
+  without a live database.
+- Release tooling: minimal per-feature extension of `scripts/release.sh`
+  (optional notes-file argument composing "FlowPilot <tag> — <subject>"
+  for the annotated tag and GitHub Release; v0.1.0 defaults unchanged) —
+  documented in `RELEASE_PROCESS.md`.
+
+### Generated Files
+
+`src/server/security/invitation-token.ts`, `src/features/invitations/
+{README.md,types.ts,schemas/invitation-schema.ts,server/invitation-service.ts}`;
+updated `src/server/repositories/invitation.repository.ts`,
+`scripts/release.sh`, `docs/RELEASE_PROCESS.md`, this file,
+`docs/DATABASE.md`, `docs/CURRENT_STATE.md`, `docs/PROJECT_STATUS.md`,
+`docs/DECISIONS.md` (#23).
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05
+  pattern): **28/28 checks passed** offline with in-memory repository
+  stand-ins — token non-empty/URL-safe/unique, hash determinism +
+  hex-only, hash-only persistence (raw token never in create payloads
+  or stored records), no console logging (source scan), expiry exactly
+  +7 days, email normalization, duplicate-OPEN rejection (incl.
+  case-variant email), same email allowed across different businesses,
+  expired/revoked/accepted invitations all allow re-invitation,
+  business-scoped listing (cross-tenant records invisible), list items
+  and results exclude `tokenHash`, derived statuses match the model,
+  revoke semantics (pending → REVOKED, idempotent re-revoke with no
+  extra write, accepted → INVALID_INVITATION_STATE, cross-tenant →
+  INVITATION_NOT_FOUND), invalid role/email/businessId rejection.
+- `pnpm db:generate` ✅ · `pnpm typecheck` ✅ · `pnpm lint` ✅
+- `pnpm verify` (full gate: lint/typecheck/format/build --webpack) ✅
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated): the
+  transactional duplicate-open guard against a real database and actual
+  persistence — this device has a placeholder `DATABASE_URL` and cannot
+  run the Prisma schema engine; migration `20260902120000` remains
+  unapplied on-device (apply from desktop/CI: `pnpm db:deploy`).
+
+### Known Limitations
+
+- No server actions / UI yet — the future Team management prompt wraps
+  this service with auth guards + revalidation; role-specific
+  authorization decisions belong to that prompt (server-side
+  authorization remains mandatory per DECISIONS #22).
+- Raw-token delivery (email / WhatsApp link) is out of scope; the
+  caller receives the raw token exactly once at creation.
+- Duplicate-open prevention is transaction-scoped application logic —
+  the same accepted race caveat as appointments (no DB exclusion
+  constraint); pilot volume makes this acceptable.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -1052,8 +1151,15 @@ No application feature code changed.
   complete:** `Invitation` Prisma model + migration + repository +
   validation + domain type implemented. Data primitives only — no token
   generation, no workflows, no UI, no activation, no auth changes.
-- **Next Step:** Prompt 03 — Invitation Creation Foundation (operator
-  FlowPilot series; continues as internal ledger Prompt 11): token
-  generation (hash-only storage) + invitation create/list/revoke
-  operations only. Do NOT combine creation + acceptance + activation.
+- **Invitation creation foundation (PROMPT-03) complete:** secure token
+  generation + hash-only persistence, centralized 7-day expiry,
+  duplicate-open-invitation prevention (transactional), business-scoped
+  list/revoke service operations with typed results, and the minimal
+  per-feature release-tooling extension. No UI, no acceptance, no
+  activation, no delivery.
+- **Next Step:** Invitation acceptance + account activation (accept a
+  valid pending token, expiry enforcement, set password / activate via
+  Better Auth, onboarding hand-off). Do NOT combine with the Team
+  management UI — that lands afterwards and composes the existing
+  service. Then customers → staff → services → settings → team.
 - After each prompt: update this file and `DECISIONS.md`.
