@@ -110,14 +110,25 @@ on-device (→ migrate from desktop/CI).
 
 ## Release Status
 
-**v0.1.0 — Initial Pilot-Ready Core: PREPARED, NOT YET PUBLISHED.**
+- **v0.1.0 — Initial Pilot-Ready Core: PUBLISHED** (GitHub Release
+  exists on the lightweight tag at the initial scaffold commit;
+  published 2026-08-27 — the earlier "prepared, not published" wording
+  in this section predated the actual publication).
+- **v0.2.0 — Invitation Creation Foundation: TAGGED LOCALLY, NOT YET
+  PUBLISHED.** Annotated tag `v0.2.0` points at the PROMPT-03 commit;
+  `main` (including the invitation data-model + creation-foundation
+  commits) is pushed. Publishing the tag + GitHub Release is blocked by
+  the documented release gate `pnpm run doctor` (this device has a
+  placeholder `DATABASE_URL` — a user action, not a code defect).
+- To publish after setting a real `DATABASE_URL` in `.env.local`:
 
-- Release automation: `scripts/release.sh` (`pnpm release`) — gated,
-  idempotent, refuses to push unless doctor + verify + security all pass.
-- Blocked by ONE remaining user action (see `RELEASE_REPORT.md`; `gh` is now
-  authenticated): set a real `DATABASE_URL` in `.env.local` (doctor gate).
-- After that: `pnpm release` creates the private repo `flowpilot`, the commit
-  `feat: initial pilot-ready release`, tag `v0.1.0`, and the GitHub Release.
+  ```bash
+  bash scripts/release.sh flowpilot v0.2.0 <notes-file>
+  ```
+
+  (release notes with the required sections were prepared during
+  PROMPT-03; the script skips the existing local tag and completes the
+  push + GitHub Release once the gates pass).
 
 ## Next Spec
 

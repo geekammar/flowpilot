@@ -59,8 +59,13 @@ Authentication & Authorization Model`.
 vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   Ops 06 above. Remaining deploy steps are user actions (env vars in Vercel,
   `pnpm db:deploy` vs Neon, push repo, import) — see `docs/DEPLOYMENT_STATUS.md`.
-- **Release:** v0.1.0 prepared; `gh` is authenticated — publishing blocked on
-  a real `DATABASE_URL` only, then `pnpm release` (see `RELEASE_REPORT.md`).
+- **Release:** v0.1.0 published on GitHub (2026-08-27). v0.2.0 —
+  Invitation Creation Foundation: annotated tag created locally on the
+  PROMPT-03 commit and `main` is pushed; tag push + GitHub Release are
+  blocked by the doctor gate (placeholder `DATABASE_URL` on this device)
+  — after setting a real `DATABASE_URL`, run
+  `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` (see
+  `PROJECT_STATUS.md → Release Status`).
 - **Next step (product):** Invitation acceptance + account activation
   (accept a valid pending token, set password via Better Auth, activate)
   — then customers → staff → services → settings → team (`BUILD_STATE.md`).

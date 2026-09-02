@@ -1091,6 +1091,19 @@ updated `src/server/repositories/invitation.repository.ts`,
   the same accepted race caveat as appointments (no DB exclusion
   constraint); pilot volume makes this acceptable.
 
+### Release
+
+- Atomic commit `feat(invitations): add invitation creation foundation`
+  (the earlier uncommitted auth-alignment docs + invitation data-model
+  work from the two preceding prompts was landed first as its own
+  attributed commit, keeping this one atomic).
+- Annotated tag `v0.2.0` — Invitation Creation Foundation points at the
+  PROMPT-03 commit; `main` is pushed to origin. Tag push + GitHub
+  Release are blocked by the documented release gate (`pnpm run doctor`
+  → NOT READY: placeholder `DATABASE_URL` on this device — user action).
+  Publish afterwards with `bash scripts/release.sh flowpilot v0.2.0
+<notes-file>` (per-feature notes-file support added in this prompt).
+
 ---
 
 ## Current State Summary
