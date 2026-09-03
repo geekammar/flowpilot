@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-05 —
-> ADMIN Account Activation Foundation).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-05A —
+> GitHub Release Publication Recovery).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -121,30 +121,32 @@ on-device (→ migrate from desktop/CI).
   exists on the lightweight tag at the initial scaffold commit;
   published 2026-08-27 — the earlier "prepared, not published" wording
   in this section predated the actual publication).
-- **v0.2.0 — Invitation Creation Foundation: TAGGED LOCALLY, NOT YET
-  PUBLISHED.** Annotated tag `v0.2.0` points at the PROMPT-03 commit;
-  `main` (including the invitation data-model + creation-foundation
-  commits) is pushed. Publishing the tag + GitHub Release is blocked by
-  the documented release gate `pnpm run doctor` (this device has a
-  placeholder `DATABASE_URL` — a user action, not a code defect).
-- **v0.3.0 — Invitation Acceptance Foundation: TAGGED LOCALLY, NOT YET
-  PUBLISHED.** Annotated tag `v0.3.0` points at the PROMPT-04 commit;
-  `main` is pushed. Same gate as v0.2.0 (placeholder `DATABASE_URL`).
-- **v0.4.0 — ADMIN Account Activation Foundation: TAGGED LOCALLY, NOT
-  YET PUBLISHED.** Annotated tag `v0.4.0` points at the PROMPT-05
-  commit (`feat(auth): add ADMIN account activation`); `main` is
-  pushed. Same gate as v0.2.0/v0.3.0 (placeholder `DATABASE_URL`).
-- To publish after setting a real `DATABASE_URL` in `.env.local`:
-
-  ```bash
-  bash scripts/release.sh flowpilot v0.2.0 <notes-file>
-  bash scripts/release.sh flowpilot v0.3.0 <notes-file>
-  bash scripts/release.sh flowpilot v0.4.0 <notes-file>
-  ```
-
-  (release notes with the required sections are prepared per feature;
-  the script skips existing local tags and completes the push + GitHub
-  Release once the gates pass).
+- **v0.2.0 — Invitation Creation Foundation: PUBLISHED** (2026-09-03,
+  PROMPT-05A). Annotated tag `v0.2.0` points at the PROMPT-03 commit
+  (`4c80f13`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.2.0 — Invitation Creation Foundation" exists.
+- **v0.3.0 — Invitation Acceptance Foundation: PUBLISHED** (2026-09-03,
+  PROMPT-05A). Annotated tag `v0.3.0` points at the PROMPT-04 commit
+  (`ef012f0`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.3.0 — Invitation Acceptance Foundation" exists.
+- **v0.4.0 — ADMIN Account Activation Foundation: PUBLISHED**
+  (2026-09-03, PROMPT-05A — current Latest release). Annotated tag
+  `v0.4.0` points at the PROMPT-05 commit (`896188a`, `feat(auth): add
+ADMIN account activation`); the tag is pushed to origin and the
+  GitHub Release "FlowPilot v0.4.0 — ADMIN Account Activation
+  Foundation" exists.
+- Publication history was reconciled by PROMPT-05A (operations-only):
+  local `main` was already current on origin (no commit push needed);
+  the three missing tags were pushed normally (no force) and the
+  missing GitHub Releases were created in chronological order with
+  notes built only from verified BUILD_STATE/commit scope. Future
+  releases continue through `bash scripts/release.sh flowpilot <tag>
+<notes-file>` once its gates pass.
+- **Open item (user action):** the GitHub repository is currently
+  **public**, but `GITHUB_WORKFLOW.md` / DECISIONS #18 require
+  **private** during the discovery stage — fix with
+  `gh repo edit geekammar/flowpilot --visibility private` (or GitHub →
+  Settings → Change visibility).
 
 ## Next Spec
 

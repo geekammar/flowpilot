@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-05 (ADMIN Account Activation Foundation).
+> Last updated: PROMPT-05A (GitHub Release Publication Recovery).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1103,6 +1103,9 @@ updated `src/server/repositories/invitation.repository.ts`,
   → NOT READY: placeholder `DATABASE_URL` on this device — user action).
   Publish afterwards with `bash scripts/release.sh flowpilot v0.2.0
 <notes-file>` (per-feature notes-file support added in this prompt).
+- **Published (PROMPT-05A, 2026-09-03):** tag `v0.2.0` pushed to origin
+  and GitHub Release "FlowPilot v0.2.0 — Invitation Creation
+  Foundation" created — see the PROMPT-05A section.
 
 ---
 
@@ -1251,6 +1254,9 @@ foundation` (implementation + docs only; schema untouched).
   (`pnpm run doctor` → NOT READY: placeholder `DATABASE_URL` on this
   device — user action), same as v0.2.0. Publish afterwards with
   `bash scripts/release.sh flowpilot v0.3.0 <notes-file>`.
+- **Published (PROMPT-05A, 2026-09-03):** tag `v0.3.0` pushed to origin
+  and GitHub Release "FlowPilot v0.3.0 — Invitation Acceptance
+  Foundation" created — see the PROMPT-05A section.
 
 ---
 
@@ -1454,6 +1460,77 @@ activatedAt), `src/features/invitations/README.md`; updated
   afterwards with `bash scripts/release.sh flowpilot v0.4.0
 <notes-file>` (prepared notes: required sections per
   RELEASE_PROCESS.md).
+- **Published (PROMPT-05A, 2026-09-03):** tag `v0.4.0` pushed to origin
+  and GitHub Release "FlowPilot v0.4.0 — ADMIN Account Activation
+  Foundation" created — now the repository's Latest release; see the
+  PROMPT-05A section.
+
+---
+
+## PROMPT-05A — GitHub Release Publication Recovery (Ops Only)
+
+**Status:** ✅ Complete (operations-only)
+
+> Reconciled local git release state with GitHub and published the
+> existing valid tags/releases. No product code, schema, Better Auth,
+> invitation/activation logic, or script changes; no new tag created, no
+> existing tag modified/renamed/moved/deleted, no force-push, no history
+> rewrite. No doctor / release-script / deployment commands were run —
+> GitHub publication was the only goal (the doctor gate remains intact
+> and still governs future `pnpm release` runs).
+
+### Completed Work
+
+- **Baseline verified:** clean working tree; branch `main`; HEAD
+  `075f562` = `origin/main` (no commit push required); origin =
+  `github.com/geekammar/flowpilot` (the expected FlowPilot repository);
+  `gh auth status` authenticated (account `geekammar`).
+- **Local versions discovered:** `v0.1.0` (lightweight tag → `dba5e40`,
+  initial scaffold commit), `v0.2.0` (annotated → `4c80f13`, PROMPT-03
+  commit), `v0.3.0` (annotated → `ef012f0`, PROMPT-04 commit), `v0.4.0`
+  (annotated → `896188a`, PROMPT-05 commit). Remote previously had only
+  `v0.1.0` (at the matching commit — no collision) and one GitHub
+  Release (`FlowPilot v0.1.0`, published 2026-08-27).
+- **Tags published** (normal push, chronological order): `v0.2.0`,
+  `v0.3.0`, `v0.4.0` — verified via `git ls-remote --tags origin`
+  (each remote peeled commit matches the intended target).
+- **GitHub Releases created** (chronological order, `gh release create
+--verify-tag`, titles matching the annotated tag messages):
+  "FlowPilot v0.2.0 — Invitation Creation Foundation",
+  "FlowPilot v0.3.0 — Invitation Acceptance Foundation",
+  "FlowPilot v0.4.0 — ADMIN Account Activation Foundation" (now the
+  Latest release). Notes contain only verified scope from
+  `BUILD_STATE.md`, the tag commits, and the git log (Added / Fixed /
+  Security / Verification / Documentation / tag range).
+- **Documentation reconciled:** `PROJECT_STATUS.md` (Release Status),
+  `CURRENT_STATE.md` (Release bullet), this file (publication notes on
+  the PROMPT-03/04/05 Release subsections + Current State Summary).
+
+### Verification
+
+- `git ls-remote --tags origin`: v0.1.0 → `dba5e40`, v0.2.0 → `4c80f13`,
+  v0.3.0 → `ef012f0`, v0.4.0 → `896188a` ✅
+- `gh release view` per tag: all four releases exist with correct
+  titles, published (not draft, not prerelease) ✅
+- `git status --short` clean after the reconciliation commit ✅
+
+### Known Issues / Remaining User Actions
+
+- **Repository visibility:** `geekammar/flowpilot` is currently PUBLIC;
+  `GITHUB_WORKFLOW.md` and DECISIONS #18 require PRIVATE during the
+  discovery stage (pilot businesses + strategy are confidential — the
+  full source is already public on `main`, predating this prompt).
+  User action: `gh repo edit geekammar/flowpilot --visibility private`
+  (or GitHub → Settings → Danger Zone → Change visibility). NOT changed
+  by this prompt — repo settings are outside its authorized scope.
+- The device-local doctor gate (placeholder `DATABASE_URL`) is
+  untouched and still gates future `pnpm release` runs; it did not
+  block this publication per PROMPT-05A rules.
+
+### Next Step (product — unchanged)
+
+PROMPT-06 — ADMIN Activation → Onboarding Integration. Do NOT implement
+it in ops prompts.
 
 ---
 
@@ -1480,9 +1557,8 @@ activatedAt), `src/features/invitations/README.md`; updated
   `docs/TROUBLESHOOTING.md`.
 - **Ops 03 (release pass) complete:** git audit clean, release automation
   `pnpm release` (gated: gh-auth → doctor → verify → security), release/ops
-  docs, status snapshot. **v0.1.0 prepared but NOT published** — blocked on
-  `gh auth login` + real `DATABASE_URL`, then `pnpm release` finishes — see
-  `docs/RELEASE_REPORT.md`.
+  docs, status snapshot. **v0.1.0 published 2026-08-27** — see
+  `docs/RELEASE_REPORT.md` and `PROJECT_STATUS.md → Release Status`.
 - **Ops 04 (Vercel deployment pass) complete:** audit + fixes (postinstall
   Prisma generation, `vercel.json` build command + SW cache headers),
   `pnpm vercel:check` env validation, `/api/health`, gated
@@ -1541,6 +1617,12 @@ activatedAt), `src/features/invitations/README.md`; updated
   transaction; full rollback on conflict). Better Auth owns
   credentials (signUpEmail + adapter transaction option); FlowPilot
   owns the invitation lifecycle and Business membership. No UI.
+- **Release publication recovery (PROMPT-05A, ops-only) complete:**
+  tags v0.2.0 / v0.3.0 / v0.4.0 pushed to origin and their GitHub
+  Releases created (2026-09-03) — all four versions are now published
+  and local/remote `main` are in sync. Remaining user action: make the
+  GitHub repository private (it is currently public; see the
+  PROMPT-05A section).
 - **Next Step:** PROMPT-06 — ADMIN Activation → Onboarding Integration
   (connect the activated ADMIN into the existing onboarding wizard;
   compose accept + activate at the route layer when the activation UI
