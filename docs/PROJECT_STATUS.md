@@ -130,11 +130,16 @@ on-device (→ migrate from desktop/CI).
 - **v0.3.0 — Invitation Acceptance Foundation: TAGGED LOCALLY, NOT YET
   PUBLISHED.** Annotated tag `v0.3.0` points at the PROMPT-04 commit;
   `main` is pushed. Same gate as v0.2.0 (placeholder `DATABASE_URL`).
+- **v0.4.0 — ADMIN Account Activation Foundation: TAGGED LOCALLY, NOT
+  YET PUBLISHED.** Annotated tag `v0.4.0` points at the PROMPT-05
+  commit (`feat(auth): add ADMIN account activation`); `main` is
+  pushed. Same gate as v0.2.0/v0.3.0 (placeholder `DATABASE_URL`).
 - To publish after setting a real `DATABASE_URL` in `.env.local`:
 
   ```bash
   bash scripts/release.sh flowpilot v0.2.0 <notes-file>
   bash scripts/release.sh flowpilot v0.3.0 <notes-file>
+  bash scripts/release.sh flowpilot v0.4.0 <notes-file>
   ```
 
   (release notes with the required sections are prepared per feature;

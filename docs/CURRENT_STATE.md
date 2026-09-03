@@ -78,15 +78,14 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   Ops 06 above. Remaining deploy steps are user actions (env vars in Vercel,
   `pnpm db:deploy` vs Neon, push repo, import) — see `docs/DEPLOYMENT_STATUS.md`.
 - **Release:** v0.1.0 published on GitHub (2026-08-27). v0.2.0 —
-  Invitation Creation Foundation: annotated tag created locally on the
-  PROMPT-03 commit; tag push + GitHub Release are blocked by the doctor
-  gate (placeholder `DATABASE_URL` on this device). v0.3.0 —
-  Invitation Acceptance Foundation: annotated tag on the PROMPT-04
-  commit, `main` pushed — same tag-push/release gate applies.
-  After setting a real `DATABASE_URL`, publish with
-  `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` and
-  `bash scripts/release.sh flowpilot v0.3.0 <notes-file>` (see
-  `PROJECT_STATUS.md → Release Status`).
+  Invitation Creation Foundation, v0.3.0 — Invitation Acceptance
+  Foundation, and v0.4.0 — ADMIN Account Activation Foundation: each
+  has an annotated tag on its feature commit and `main` pushed; tag
+  pushes + GitHub Releases are blocked by the doctor gate (placeholder
+  `DATABASE_URL` on this device). After setting a real
+  `DATABASE_URL`, publish with
+  `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` (likewise
+  v0.3.0 / v0.4.0) (see `PROJECT_STATUS.md → Release Status`).
 - **Next step (product):** PROMPT-06 — ADMIN Activation → Onboarding
   Integration (connect the activated ADMIN into the existing
   onboarding wizard; compose accept + activate at the route layer

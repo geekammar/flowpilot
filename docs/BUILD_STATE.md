@@ -1442,6 +1442,19 @@ activatedAt), `src/features/invitations/README.md`; updated
 - Token delivery remains out of scope; the caller of creation
   received the raw token exactly once.
 
+### Release
+
+- Atomic commit `feat(auth): add ADMIN account activation`
+  (`896188a`) — implementation + docs only; no dependency changes.
+- Annotated tag `v0.4.0` — ADMIN Account Activation Foundation points
+  at the PROMPT-05 commit; `main` is pushed to origin. Tag push +
+  GitHub Release are blocked by the documented release gate
+  (`pnpm run doctor` → NOT READY: placeholder `DATABASE_URL` on this
+  device — user action), same as v0.2.0 and v0.3.0. Publish
+  afterwards with `bash scripts/release.sh flowpilot v0.4.0
+<notes-file>` (prepared notes: required sections per
+  RELEASE_PROCESS.md).
+
 ---
 
 ## Current State Summary
