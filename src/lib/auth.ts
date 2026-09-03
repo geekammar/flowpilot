@@ -11,6 +11,11 @@ export const auth = betterAuth({
   trustedOrigins: [env.NEXT_PUBLIC_APP_URL],
   database: prismaAdapter(db, {
     provider: "postgresql",
+    // User + credential-account writes (e.g. signUpEmail) run in ONE
+    // Prisma transaction — the public adapter option of the installed
+    // version. Cross-boundary activation consistency is completed by
+    // the invitation activation workflow's idempotent resume design.
+    transaction: true,
   }),
   emailAndPassword: {
     enabled: true,

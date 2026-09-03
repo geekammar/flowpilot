@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-04 —
-> Invitation Acceptance Foundation).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-05 —
+> ADMIN Account Activation Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -27,26 +27,30 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Invitation data model (schema/migration/repo/validation) | ✅ complete (Prompt 10)                |
 | Invitation creation foundation (service layer)           | ✅ complete (PROMPT-03)                |
 | Invitation acceptance foundation (service layer)         | ✅ complete (PROMPT-04)                |
-| Account activation (password setup, Better Auth)         | ⏳ not started (next — PROMPT-05)      |
+| ADMIN account activation (Better Auth + membership)      | ✅ complete (PROMPT-05, service layer) |
+| Activation → onboarding integration                      | ⏳ not started (next — PROMPT-06)      |
 | Customers directory                                      | ⏳ placeholder                         |
 | Services management                                      | ⏳ placeholder                         |
 | Business settings / knowledge screens                    | ⏳ placeholder                         |
 | Team management (admin)                                  | ⏳ placeholder                         |
 | Staff area                                               | ⏳ placeholder                         |
 
-Auth note (Prompts 09–10 + PROMPT-03/04): account creation for the
-pilot stage is invitation-first — the Platform Operator provisions the
-Business and invites the initial ADMIN; public self-sign-up is NOT the
-primary pilot flow (future self-serve mode remains architecturally
+Auth note (Prompts 09–10 + PROMPT-03/04/05): account creation for the
+pilot stage is invitation-first — the Platform Operator provisions
+the Business and invites the initial ADMIN; public self-sign-up is NOT
+the primary pilot flow (future self-serve mode remains architecturally
 possible). The `/sign-up` placeholder page remains in code but is no
 longer a planned deliverable. The Invitation DATA foundation (model,
 migration, repository, validation), the creation foundation (secure
 token generation with hash-only persistence, 7-day expiry,
 duplicate-open prevention, business-scoped create/list/revoke service
-operations), AND the acceptance foundation (one-time, atomic,
-token-based acceptance with lifecycle enforcement and a safe
-invitation-context result) are implemented; account activation, token
-delivery, and all invitation UI are not yet implemented.
+operations), the acceptance foundation (one-time, atomic, token-based
+acceptance with lifecycle enforcement and a safe invitation-context
+result), AND the ADMIN account activation foundation (Better Auth
+identity creation, one identity per email, one-time atomic
+`activatedAt` + Business ADMIN membership) are implemented at the
+service layer; token delivery and all invitation/activation UI are
+not yet implemented.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -139,9 +143,10 @@ on-device (→ migrate from desktop/CI).
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: account activation
-(PROMPT-05, next) → customers → staff area → services → settings →
-team). Spec A exit criteria live in `ROADMAP.md`.
+**Finish Spec A first** (recommended order: activation → onboarding
+integration (PROMPT-06, next) → invitation/activation UI → customers
+→ staff area → services → settings → team). Spec A exit criteria live
+in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

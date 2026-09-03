@@ -50,7 +50,29 @@ export const acceptInvitationInputSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, "رمز الدعوة غير صالح"),
 });
 
+/**
+ * ADMIN account activation input (PROMPT-05). Same token-only authority
+ * rule as acceptance: the persisted invitation is the sole source of
+ * businessId/email/role — callers cannot override them (unknown keys
+ * are stripped by Zod). `password` is chosen by the person activating;
+ * its bounds mirror Better Auth's configured defaults (min 8 / max 128)
+ * so input validation and the identity provider agree — no separate
+ * password policy is invented here. `name` is the display name Better
+ * Auth requires, following the user-validation conventions.
+ */
+export const activateAdminAccountInputSchema = z.object({
+  token: acceptInvitationInputSchema.shape.token,
+  name: z.string().trim().min(2, "الاسم قصير جداً").max(120, "الاسم طويل جداً"),
+  password: z
+    .string()
+    .min(8, "كلمة المرور يجب ألا تقل عن 8 أحرف")
+    .max(128, "كلمة المرور طويلة جداً"),
+});
+
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 export type ListInvitationsInput = z.infer<typeof listInvitationsInputSchema>;
 export type RevokeInvitationInput = z.infer<typeof revokeInvitationInputSchema>;
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationInputSchema>;
+export type ActivateAdminAccountInput = z.infer<
+  typeof activateAdminAccountInputSchema
+>;

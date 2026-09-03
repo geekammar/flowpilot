@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-04 (Invitation Acceptance Foundation).
+> Last updated: PROMPT-05 (ADMIN Account Activation Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1254,6 +1254,196 @@ foundation` (implementation + docs only; schema untouched).
 
 ---
 
+## PROMPT-05 — ADMIN Account Activation Foundation
+
+**Status:** ✅ Complete
+
+> Server/domain/auth integration only: connects an already-accepted
+> ADMIN invitation to a real Better Auth identity and activates the
+> Business ADMIN account. Better Auth owns the authentication identity
+> (password hash, credential account, sessions); FlowPilot owns the
+> Business membership (businessId, role ADMIN, isActive) and the
+> invitation lifecycle. No UI, no onboarding changes, no STAFF
+> activation, no routes, no delivery.
+
+### ALREADY IMPLEMENTED (reused, untouched in spirit)
+
+- Invitation data model (Prompt 10) — schema, migration, indexes
+- Invitation creation foundation (PROMPT-03) — token generation,
+  hash-only persistence, centralized 7-day expiry, duplicate-open
+  prevention, create/list/revoke service operations
+- Invitation acceptance foundation (PROMPT-04) — one-time, atomic,
+  token-based acceptance
+- Token hashing utility (`hashInvitationToken`), derived lifecycle
+  helper (`deriveInvitationStatus`), Arabic typed-error conventions
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **ADMIN account activation** (`activateAdminAccount` service
+  operation + `activateInvitedAdmin` repository primitive +
+  `activateAdminAccountInputSchema`): eligibility (ADMIN role,
+  accepted, unrevoked, unactivated — pending/expired/revoked/STAFF
+  rejected with typed Arabic errors) → identity collision handling →
+  Better Auth identity creation when none exists → atomic invitation
+  activation + Business ADMIN membership → safe result
+  (`{invitation, userId, identityCreated}`).
+- **Better Auth identity integration**: the installed version's
+  official server-side `auth.api.signUpEmail` behind an injectable
+  `IdentityCreator` dependency; Better Auth owns the password hash,
+  the credential account, and sessions. The prismaAdapter now runs
+  with its public `transaction: true` option so the user + credential
+  account rows are created atomically inside Better Auth.
+- **Business ADMIN membership**: `businessId` + `role ADMIN` +
+  `isActive true` derived from the invitation only — callers cannot
+  override businessId/role/email (Zod strips every other key).
+- **Account activation state**: `Invitation.activatedAt` (nullable
+  timestamp, set exactly once) — the minimum schema change that
+  guarantees one-time activation; `deriveInvitationStatus` now derives
+  ACTIVATED (accepted + activatedAt), and the acceptance classifier
+  maps ACTIVATED → INVITATION_ALREADY_ACCEPTED.
+- **One-identity-per-email collision handling**: existing identities
+  are never duplicated, never password-reset, never silently moved or
+  promoted — same-Business ADMIN resumes idempotently,
+  never-assigned identities (interrupted activation) are attached,
+  other-Business users and same-Business STAFF get `ACCOUNT_CONFLICT`;
+  a USER_ALREADY_EXISTS race is re-read and classified the same way.
+- **Focused tests**: temporary tsx verification harness — **79/79
+  checks passed** offline with in-memory stand-ins modeling the
+  transactional semantics (details below); removed after the run.
+- **Verification**: full quality gate (details below).
+
+### NOT IMPLEMENTED (later prompts)
+
+- Invitation UI / activation UI (`/invite/[token]`, password form)
+- Activation → onboarding integration (PROMPT-06)
+- STAFF activation
+- Team UI
+- Founder/Platform UI (Spec B)
+- Public self-sign-up (not the primary pilot model)
+- Token delivery (email/WhatsApp link)
+
+The next step is:
+
+PROMPT-06 — ADMIN Activation → Onboarding Integration
+
+Do NOT implement it now.
+
+### Completed Work (details)
+
+- `Invitation.activatedAt DateTime?` + migration
+  `20260903120000_invitation_activation` (SQL authored on-device in
+  Prisma's migration style — the schema-engine binary cannot execute
+  on Termux; apply from desktop/CI with `pnpm db:deploy`). No index
+  added (no query pattern yet, consistent with the no-speculative-
+  indexes decision).
+- `InvitationRepository.activateInvitedAdmin({invitationId, userId,
+businessId})`: ONE Prisma transaction — validation reads → one-time
+  conditional `activatedAt` guard (concurrent activations serialize;
+  the loser reads ALREADY_ACTIVATED) → conditional membership attach
+  (`businessId IS NULL` OR same-Business ADMIN; sets businessId, role
+  ADMIN, isActive true) → `InvitationActivationConflictError` thrown
+  to roll the whole transaction back when the attach guard loses a
+  race (e.g., the same email activated for another Business
+  concurrently).
+- `UserRepository.findByEmail(email)`: minimal identity lookup for the
+  collision handling (Better Auth owns email uniqueness).
+- `activateAdminAccount` service operation: token-scoped (hash-only
+  lookup; the persisted invitation is the sole authority), explicit
+  revoked check (defense in depth), derived-lifecycle eligibility
+  switch, collision classification helper, identity creation via the
+  injectable dependency with APIError mapping (USER_ALREADY_EXISTS →
+  re-read + resume/conflict; PASSWORD_TOO_SHORT/LONG → INVALID_INPUT;
+  anything else → IDENTITY_CREATION_FAILED without internals),
+  repository-outcome mapping to typed Arabic results.
+- `activateAdminAccountInputSchema`: token (base64url, same rules as
+  acceptance), name (2–120, user-validation conventions), password
+  (8–128 — mirroring Better Auth's configured defaults, no invented
+  policy); Arabic-first messages.
+- New typed result codes (additive): `INVITATION_NOT_ACCEPTED`,
+  `ACCOUNT_ALREADY_ACTIVATED`, `ROLE_NOT_ALLOWED`, `ACCOUNT_CONFLICT`,
+  `IDENTITY_CREATION_FAILED`; `ActivateAdminAccountSuccess` carries
+  only safe data. `InvitationView` now includes `activatedAt`.
+- Better Auth server config: `prismaAdapter(db, { provider:
+"postgresql", transaction: true })` — the documented public option
+  of the installed 1.7.1; no version change, no plugins.
+- Decision #22 `accountType` discriminator: NOT added — activation
+  creates BUSINESS identities only, nothing infers or grants platform
+  access, and the full discriminator (nullable role etc.) is a broader
+  authorization change belonging to the future platform-identity
+  prompt. Documented in DATABASE.md.
+
+### Generated Files
+
+`prisma/migrations/20260903120000_invitation_activation/migration.sql`;
+updated `prisma/schema.prisma` (activatedAt), `src/lib/auth.ts`
+(adapter transaction option), `src/server/repositories/
+invitation.repository.ts` (activation primitive + conflict error +
+outcome type), `src/server/repositories/user.repository.ts`
+(findByEmail), `src/features/invitations/server/invitation-service.ts`
+(activateAdminAccount + identity creator + lifecycle extension),
+`src/features/invitations/schemas/invitation-schema.ts` (activation
+input), `src/features/invitations/types.ts` (codes + success shape +
+activatedAt), `src/features/invitations/README.md`; updated
+`docs/BUILD_STATE.md`, `docs/DATABASE.md`, `docs/CURRENT_STATE.md`,
+`docs/PROJECT_STATUS.md`.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03/04 pattern): **79/79 checks passed** offline with
+  in-memory repository/identity stand-ins modeling the atomic
+  conditional-guard + conditional-attach + rollback semantics —
+  valid accepted ADMIN invitation activates (one identity, membership
+  attached, activatedAt set); pending/expired/revoked/STAFF/unknown-
+  token rejections with typed codes and zero writes; impossible
+  accepted+revoked record still never activates; invalid password /
+  name / token-charset input rejected before any lookup; businessId /
+  role / email not overridable (identity uses the invitation's
+  values); exactly one identity per email; repeated activation →
+  ACCOUNT_ALREADY_ACTIVATED with no second identity and no password
+  reset; existing same-Business ADMIN resumes safely; cross-business
+  user rejected and not moved; same-Business STAFF not promoted;
+  interrupted activation (identity without membership) resumes and
+  attaches; USER_ALREADY_EXISTS race resumes-or-conflicts correctly;
+  identity-creation failure leaves no membership writes; concurrent
+  activations produce exactly one winner + ACCOUNT_ALREADY_ACTIVATED
+  loser + exactly one identity; acceptance of an ACTIVATED invitation
+  reports INVITATION_ALREADY_ACCEPTED (regression); derived lifecycle
+  statuses unchanged except the new ACTIVATED; result omits raw token
+  / tokenHash / password; safe top-level result shape; no stored
+  record contains the raw token or password; no console logging in
+  any changed module (source scan); membership scoped to the
+  invitation's Business only.
+- `pnpm db:generate` ✅ · `pnpm typecheck` ✅ · `pnpm lint` ✅
+- `pnpm verify` (full gate: lint/typecheck/format/build --webpack) ✅
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated): the
+  real-database behavior of `activateInvitedAdmin` (two truly
+  concurrent Prisma transactions against PostgreSQL), the actual
+  `auth.api.signUpEmail` call against a live database (this device has
+  a placeholder `DATABASE_URL` and cannot run the Prisma schema
+  engine), and migration application. Migrations `20260902120000` and
+  `20260903120000` remain unapplied on-device (apply from desktop/CI:
+  `pnpm db:deploy`). The single-statement conditional-UPDATE guard is
+  the standard Postgres-safe pattern, and the in-memory harness
+  verifies the workflow logic around it. A real-DB integration test
+  should accompany the first deployment against Neon.
+
+### Known Limitations
+
+- No route/server action exposes activation yet — PROMPT-06 / the
+  activation UI prompt composes `acceptInvitation` +
+  `activateAdminAccount` at the route layer (the service intentionally
+  stays a domain operation per the existing architecture).
+- `auth.api.signUpEmail` auto-signs-in (creates a session row); the
+  session token is discarded by the service and never returned or
+  logged. Whether the activation flow reuses that session is a
+  route-layer decision for the UI prompt.
+- Token delivery remains out of scope; the caller of creation
+  received the raw token exactly once.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -1263,8 +1453,9 @@ foundation` (implementation + docs only; schema untouched).
   settings/knowledge screens, Team management (admin), and the Staff area.
   (The `/sign-up` placeholder page remains in code but is no longer a
   planned deliverable — superseded by the invitation-first model; the
-  invitation data foundation now exists, but the invitation workflow and
-  account activation are not yet implemented.)
+  invitation foundation, acceptance, and ADMIN account activation now
+  exist in the service layer, but all invitation/activation UI is still
+  to be built.)
 - **Ops 01 (DX pass) complete:** cross-platform bootstrap/dev scripts,
   `pnpm run setup` / `pnpm run doctor` / `pnpm verify`, safe `.env.local`
   automation, unified env precedence, per-OS setup docs — see
@@ -1326,10 +1517,21 @@ foundation` (implementation + docs only; schema untouched).
   not-found for unknown tokens, and a safe invitation context result
   (no raw token, no hash). No account activation, no Better Auth
   changes, no UI.
-- **Next Step:** PROMPT-05 — ADMIN Account Activation Foundation
-  (compose `acceptInvitation`'s result to activate the invited ADMIN:
-  password setup via Better Auth, account activation; keep it small).
-  Do NOT combine with the Team management UI — that lands afterwards
-  and composes the existing services. Then customers → staff →
-  services → settings → team.
+- **ADMIN account activation foundation (PROMPT-05) complete:** an
+  accepted ADMIN invitation becomes a real Better Auth identity with
+  Business ADMIN membership — one-time activation via the
+  `activatedAt` guard, one identity per email (no duplicates, no
+  password resets, no silent role changes), collision-safe
+  (cross-Business / STAFF conflicts typed), race-safe (concurrent
+  activations and USER_ALREADY_EXISTS handled), and atomic at the
+  domain layer (invitation mark + membership attach in one
+  transaction; full rollback on conflict). Better Auth owns
+  credentials (signUpEmail + adapter transaction option); FlowPilot
+  owns the invitation lifecycle and Business membership. No UI.
+- **Next Step:** PROMPT-06 — ADMIN Activation → Onboarding Integration
+  (connect the activated ADMIN into the existing onboarding wizard;
+  compose accept + activate at the route layer when the activation UI
+  lands). Do NOT combine with the Team management UI — that lands
+  afterwards and composes the existing services. Then customers →
+  staff → services → settings → team.
 - After each prompt: update this file and `DECISIONS.md`.

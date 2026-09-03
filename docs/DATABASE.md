@@ -14,16 +14,16 @@ Business 1 ──* Appointment     Appointment *──1 Customer / Service / Use
 Business 1 ──* Invitation      Invitation *──1 User?  (nullable invitedBy)
 ```
 
-| Entity       | Table           | Soft delete           | Notes                                                                                                                                                                                       |
-| ------------ | --------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Business     | `businesses`    | ✔                     | Root tenant. `workingHours` is JSON.                                                                                                                                                        |
-| User         | `users`         | ✖ (`isActive`)        | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`.                                                                               |
-| Service      | `services`      | ✔                     | `durationMinutes` drives appointment end times.                                                                                                                                             |
-| Customer     | `customers`     | ✔                     | Unique per business phone: `@@unique([businessId, phone])`.                                                                                                                                 |
-| Conversation | `conversations` | ✔                     | One active thread per customer flow.                                                                                                                                                        |
-| Message      | `messages`      | ✖ (immutable log)     | Append-only; deleted with its conversation (cascade).                                                                                                                                       |
-| Appointment  | `appointments`  | ✔                     | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                                                                                                       |
-| Invitation   | `invitations`   | ✖ (derived lifecycle) | Domain concept separate from Better Auth (DECISIONS #22). Only the token **hash** is stored (unique). Lifecycle from `acceptedAt`/`revokedAt`/`expiresAt` — no status enum, no `deletedAt`. |
+| Entity       | Table           | Soft delete           | Notes                                                                                                                                                                                                     |
+| ------------ | --------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business     | `businesses`    | ✔                     | Root tenant. `workingHours` is JSON.                                                                                                                                                                      |
+| User         | `users`         | ✖ (`isActive`)        | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`.                                                                                             |
+| Service      | `services`      | ✔                     | `durationMinutes` drives appointment end times.                                                                                                                                                           |
+| Customer     | `customers`     | ✔                     | Unique per business phone: `@@unique([businessId, phone])`.                                                                                                                                               |
+| Conversation | `conversations` | ✔                     | One active thread per customer flow.                                                                                                                                                                      |
+| Message      | `messages`      | ✖ (immutable log)     | Append-only; deleted with its conversation (cascade).                                                                                                                                                     |
+| Appointment  | `appointments`  | ✔                     | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                                                                                                                     |
+| Invitation   | `invitations`   | ✖ (derived lifecycle) | Domain concept separate from Better Auth (DECISIONS #22). Only the token **hash** is stored (unique). Lifecycle from `acceptedAt`/`revokedAt`/`expiresAt`/`activatedAt` — no status enum, no `deletedAt`. |
 
 ## Enums
 
@@ -58,8 +58,9 @@ Hard deletes happen only via DB cascades from a parent row.
 > Locked conceptually in Prompt 09 (Auth & User Management Architecture
 > Alignment; `DECISIONS.md` #22). Split status: the **Invitation data
 > model is IMPLEMENTED** (Prompt 10), the **Invitation creation
-> workflow is IMPLEMENTED** (PROMPT-03), and the **Invitation
-> acceptance workflow is IMPLEMENTED** (PROMPT-04) — see the three
+> workflow is IMPLEMENTED** (PROMPT-03), the **Invitation acceptance
+> workflow is IMPLEMENTED** (PROMPT-04), and the **ADMIN account
+> activation workflow is IMPLEMENTED** (PROMPT-05) — see the four
 > "CURRENT IMPLEMENTED" subsections below; everything else in this
 > section is **"Planned / next implementation step"** — no Prisma
 > fields, tables, enums, or migrations exist for those parts yet.
@@ -69,13 +70,16 @@ Hard deletes happen only via DB cascades from a parent row.
 Table `invitations` (migration `20260902120000_invitation_model`):
 
 - `id` UUID PK, `createdAt`/`updatedAt`
-- `email` TEXT — the invited address (NOT unique: the same email may be
-  invited by different Businesses, and re-invited after expiry/revocation)
+- `email` TEXT — the invited address (NOT unique: the same email may
+  be invited by different Businesses, and re-invited after expiry/revocation)
 - `business_id` FK → `businesses` (`ON DELETE CASCADE`) — tenant scope
 - `role` `UserRole` — reuses the Business role system (`ADMIN`/`STAFF`)
 - `token_hash` TEXT **unique** — secure hash of the invitation token;
   the raw token is NEVER stored
 - `expires_at`, nullable `accepted_at`, nullable `revoked_at`
+- nullable `activated_at` (added in PROMPT-05, migration
+  `20260903120000_invitation_activation`) — set exactly once when
+  account activation completes; the one-time activation guarantee
 - nullable `invited_by_id` FK → `users` (`ON DELETE SET NULL`) —
   nullable because a required relation would block future
   platform-level provisioning (Platform Operator is not a Business
@@ -88,7 +92,9 @@ Lifecycle representation — **derived, no persisted status enum and no
 `deletedAt`**:
 
 - Pending: `acceptedAt` null AND `revokedAt` null AND `expiresAt` future
-- Accepted: `acceptedAt` set
+- Accepted: `acceptedAt` set AND `activatedAt` null
+- Activated: `acceptedAt` set AND `activatedAt` set (activation
+  completed — PROMPT-05)
 - Revoked: `revokedAt` set
 - Expired: pending AND `expiresAt` past
 
@@ -158,13 +164,80 @@ delivery):
   INVITATION_EXPIRED / PERSISTENCE_FAILED. The result excludes both
   the raw token and the `tokenHash`; neither is ever logged.
 
+### CURRENT IMPLEMENTED — ADMIN account activation workflow (PROMPT-05)
+
+Connects an accepted ADMIN invitation to a real Better Auth identity
+and activates the Business ADMIN account (no UI, no session handling
+at this layer, no onboarding, no STAFF activation):
+
+- **Eligibility** (`activateAdminAccount` service operation): the
+  persisted invitation (located by token hash only) must be role
+  ADMIN, previously accepted, not revoked, and not yet activated.
+  Pending invitations (including expired-pending) and STAFF
+  invitations are rejected with typed Arabic errors
+  (`INVITATION_NOT_ACCEPTED` / `INVITATION_EXPIRED` /
+  `INVITATION_REVOKED` / `ROLE_NOT_ALLOWED`); already-activated
+  invitations return `ACCOUNT_ALREADY_ACTIVATED`. Expiry only gates
+  PENDING invitations — acceptance already ran inside the validity
+  window. The invitation is the sole authority for
+  email/businessId/role; the input schema accepts only token, name,
+  and password (Zod strips everything else — callers cannot override
+  business, role, or email).
+- **Identity creation** (Better Auth boundary): an injectable
+  `IdentityCreator` (default: the installed version's official
+  server-side `auth.api.signUpEmail`) creates the email/password
+  identity for the invitation email. Better Auth owns the password
+  hash, the credential account row, and any session; only `user.id`
+  crosses back into the domain. The prismaAdapter now runs with its
+  public `transaction: true` option, so the user + credential account
+  rows are created atomically inside Better Auth. Password bounds in
+  the input schema mirror Better Auth's configured defaults (8–128);
+  no separate password policy is invented.
+- **One identity per email**: existing identities are never
+  duplicated, never password-reset, and never silently moved or
+  promoted. Same-Business ADMIN identities resume activation
+  idempotently (`identityCreated: false`); never-assigned identities
+  (businessId null — the interrupted-activation recovery path) are
+  attached; other-Business identities and same-Business STAFF
+  identities are rejected with `ACCOUNT_CONFLICT`. A USER_ALREADY_
+  EXISTS race inside Better Auth is re-read and classified the same
+  way.
+- **Atomic activation**
+  (`InvitationRepository.activateInvitedAdmin`): ONE Prisma
+  transaction that (1) conditionally sets `invitations.activatedAt`
+  (one-time guard — concurrent activations serialize and the loser
+  reads ALREADY_ACTIVATED) and (2) conditionally attaches the Business
+  membership (`businessId`, `role: ADMIN`, `isActive: true`) only when
+  the user row is `businessId IS NULL` or already ADMIN of the SAME
+  Business; otherwise the throw rolls the whole transaction back. The
+  membership attach is therefore race-safe even when two Businesses
+  invite the same email concurrently.
+- **Cross-boundary consistency**: Better Auth identity creation and
+  the FlowPilot membership write are two sequential atomic phases
+  (no shared transaction is possible through the supported Better
+  Auth API). An interruption between them leaves a recoverable state
+  — the invitation stays unactivated while the identity has zero
+  privileges (no Business membership, no platform marker) — and a
+  retry resumes idempotently without creating a second identity or
+  touching the existing password. The reverse inconsistency (ADMIN
+  active without an identity) cannot occur because membership is only
+  written after the identity exists.
+- **Result shape**: safe data only — the invitation view (now with
+  `activatedAt`), `userId`, and `identityCreated`. Never the raw
+  token, the hash, the password, or any session token.
+
 ### PLANNED (not yet implemented — do not assume these exist)
 
-- ADMIN activation / STAFF activation (password setup, Better Auth
-  account creation — PROMPT-05)
+- STAFF activation (the STAFF analog of the ADMIN activation
+  operation)
 - Token delivery (email / WhatsApp link to the invitee)
-- Acceptance UI (`/invite/[token]`-style route)
+- Activation UI (`/invite/[token]`-style route) and the
+  activation→onboarding connection (PROMPT-06)
 - Platform Operator identity / platform-level authorization marker
+  (`accountType` discriminator from the target model below — deferred
+  until a platform identity is actually implemented; PROMPT-05
+  creates BUSINESS identities only and never infers platform access
+  from `businessId = null`)
 
 ### Target conceptual account model (planned)
 
@@ -188,8 +261,9 @@ delivery):
   states on `businesses` yet)
 - **Invitation:** `PENDING → ACCEPTED / EXPIRED / REVOKED` — the data
   representation is implemented (derived, above); creation
-  (PROMPT-03) and acceptance (PROMPT-04) workflows are implemented;
-  token delivery is planned
+  (PROMPT-03), acceptance (PROMPT-04), and ADMIN activation
+  (PROMPT-05: accepted → activated via `activatedAt`) workflows are
+  implemented; token delivery is planned
 - **Business User:** `INVITED → ACTIVE → DEACTIVATED` (an ACTIVE user may
   return to ACTIVE after reactivation) — planned
 
@@ -226,17 +300,23 @@ Highlights:
 - `AppointmentRepository` converts validated `"YYYY-MM-DD"`/`"HH:mm"` strings
   to Prisma `@db.Date`/`@db.Time` values internally.
 - `UserRepository.assignToBusiness` — links an authenticated user during
-  onboarding (defaults to `ADMIN`).
+  onboarding (defaults to `ADMIN`); `UserRepository.findByEmail` —
+  identity lookup for the invitation activation workflow's collision
+  handling (Better Auth owns email uniqueness).
 - `InvitationRepository` — data primitives + the creation guard and
-  the acceptance primitive (DECISIONS #22): `create`,
+  the acceptance/activation primitives (DECISIONS #22): `create`,
   `createIfNoOpenInvitation` (transactional duplicate-open guard,
   PROMPT-03), `findByTokenHash` (hash-only lookup),
   `findByIdWithinBusiness`, `listByBusiness` (tenant-scoped; no global
   list), guarded `revoke` / `markAccepted` (only while pending —
-  business-scoped state primitives), and `acceptPendingInvitation`
+  business-scoped state primitives), `acceptPendingInvitation`
   (PROMPT-04: atomic conditional PENDING→ACCEPTED transition by token
-  hash, including expiry enforcement at the database level). No
-  `deletedAt` filter: the entity has no soft delete.
+  hash, including expiry enforcement at the database level), and
+  `activateInvitedAdmin` (PROMPT-05: atomic one-time `activatedAt`
+  mark + conditional Business ADMIN membership attach in one
+  transaction — never promotes STAFF, never steals cross-Business
+  users, rolls back fully on conflict). No `deletedAt` filter: the
+  entity has no soft delete.
 
 ## Seeding
 

@@ -2,7 +2,8 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-04 (Invitation Acceptance Foundation).
+> Last updated: 2026-09-03 — PROMPT-05 (ADMIN Account Activation
+> Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -39,9 +40,19 @@ Authentication & Authorization Model`.
   unknown tokens get one generic not-found), a single conditional-update
   repository primitive (concurrent acceptance cannot succeed twice),
   and a safe invitation context result (id, email, businessId, role,
-  acceptedAt — never the raw token or hash). **Account activation:
-  🟡 not implemented yet (next: PROMPT-05).** **Platform Operator: 🟡
-  architecture documented, implementation pending.**
+  acceptedAt — never the raw token or hash).
+- **ADMIN account activation foundation: ✅ implemented** (PROMPT-05):
+  an accepted ADMIN invitation becomes a real Better Auth identity with
+  Business ADMIN membership — eligibility enforced (pending/expired/
+  revoked/STAFF rejected; ADMIN + accepted + unactivated only), Better
+  Auth `signUpEmail` behind an injectable dependency (Better Auth owns
+  passwords; the adapter runs with `transaction: true` so identity
+  creation is atomic), one identity per email (no duplicates, no
+  password resets, no silent role changes; cross-Business/STAFF
+  conflicts typed), one-time activation via the atomic `activatedAt`
+  guard (concurrent attempts cannot both succeed), interrupted
+  activations resumable, and safe results only. No UI yet. **Platform
+  Operator: 🟡 architecture documented, implementation pending.**
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Ops:** bootstrap + dev scripts (Win/Linux/macOS/Termux), doctor/verify/
@@ -76,8 +87,9 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` and
   `bash scripts/release.sh flowpilot v0.3.0 <notes-file>` (see
   `PROJECT_STATUS.md → Release Status`).
-- **Next step (product):** PROMPT-05 — ADMIN Account Activation
-  Foundation (compose the accepted invitation context with Better Auth
-  password setup / account activation)
+- **Next step (product):** PROMPT-06 — ADMIN Activation → Onboarding
+  Integration (connect the activated ADMIN into the existing
+  onboarding wizard; compose accept + activate at the route layer
+  when the activation UI lands)
   — then customers → staff → services → settings → team (`BUILD_STATE.md`).
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

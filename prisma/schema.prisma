@@ -194,7 +194,10 @@ model Appointment {
 // never persisted. Lifecycle is derived from timestamps (no status
 // enum, no deletedAt): pending = acceptedAt/revokedAt null + unexpired;
 // accepted = acceptedAt set; revoked = revokedAt set; expired = pending
-// + expiresAt in the past.
+// + expiresAt in the past. activatedAt marks completed account
+// activation (set exactly once by the activation workflow; a set value
+// means the invited identity was created and the Business membership
+// attached — one-time guarantee).
 
 model Invitation {
   id          String    @id @default(uuid())
@@ -205,6 +208,9 @@ model Invitation {
   expiresAt   DateTime  @map("expires_at")
   acceptedAt  DateTime? @map("accepted_at")
   revokedAt   DateTime? @map("revoked_at")
+  // Completed account activation (PROMPT-05): null until the invited
+  // identity exists and the Business membership is attached.
+  activatedAt DateTime? @map("activated_at")
   // Nullable: until the Platform Operator identity exists, a required
   // relation would block future platform-level provisioning.
   invitedById String?   @map("invited_by_id")

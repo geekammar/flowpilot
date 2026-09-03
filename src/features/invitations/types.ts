@@ -8,7 +8,7 @@ import type { UserRole } from "@/types/domain";
 
 /** Derived lifecycle (DATABASE.md) — no persisted status enum exists. */
 export type InvitationLifecycleStatus =
-  "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+  "PENDING" | "ACCEPTED" | "ACTIVATED" | "REVOKED" | "EXPIRED";
 
 /** Invitation metadata safe for feature/UI consumption (never the hash). */
 export type InvitationView = {
@@ -19,6 +19,7 @@ export type InvitationView = {
   expiresAt: Date;
   acceptedAt: Date | null;
   revokedAt: Date | null;
+  activatedAt: Date | null;
   invitedById: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +56,19 @@ export type AcceptInvitationSuccess = {
   invitation: InvitationView;
 };
 
+/**
+ * Safe activation result (PROMPT-05): the activated membership context
+ * only. `identityCreated` distinguishes a freshly created Better Auth
+ * identity from linking an existing one (interrupted-activation resume
+ * / never-assigned identity) — never a session token, never the raw
+ * token, never the hash, never the password.
+ */
+export type ActivateAdminAccountSuccess = {
+  invitation: InvitationView;
+  userId: string;
+  identityCreated: boolean;
+};
+
 export type InvitationErrorCode =
   | "INVALID_INPUT"
   | "BUSINESS_NOT_FOUND"
@@ -63,7 +77,12 @@ export type InvitationErrorCode =
   | "INVITATION_ALREADY_ACCEPTED"
   | "INVITATION_REVOKED"
   | "INVITATION_EXPIRED"
+  | "INVITATION_NOT_ACCEPTED"
   | "INVALID_INVITATION_STATE"
+  | "ROLE_NOT_ALLOWED"
+  | "ACCOUNT_ALREADY_ACTIVATED"
+  | "ACCOUNT_CONFLICT"
+  | "IDENTITY_CREATION_FAILED"
   | "PERSISTENCE_FAILED";
 
 /**

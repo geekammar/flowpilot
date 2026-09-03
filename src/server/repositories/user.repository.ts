@@ -18,6 +18,15 @@ export class UserRepository {
     return db.user.findUnique({ where: { id } });
   }
 
+  /**
+   * Identity lookup by email (Better Auth owns uniqueness). Used by the
+   * invitation activation workflow to detect existing identities before
+   * creating one — the collision cases are classified there, not here.
+   */
+  async findByEmail(email: string) {
+    return db.user.findUnique({ where: { email } });
+  }
+
   async listByBusiness(input: ListUsersDto, rawPagination?: unknown) {
     const pagination = paginationSchema.parse(rawPagination ?? {});
     return db.user.findMany({

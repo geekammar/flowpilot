@@ -111,23 +111,23 @@ collect evidence.
 
 ## Screens (Included)
 
-| Route group | Screen                | Purpose                                                                             |
-| ----------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `(auth)`    | `/sign-in`            | Login                                                                               |
-| `(auth)`    | invitation acceptance | Accept invitation, set password, activate account (planned — invitation foundation) |
-| `(app)`     | `/onboarding`         | Business onboarding wizard (after ADMIN activation)                                 |
-| `(app)`     | `/`                   | Dashboard                                                                           |
-| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions                                            |
-| `(app)`     | `/conversations`      | Thread list                                                                         |
-| `(app)`     | `/conversations/[id]` | Thread view + staff reply                                                           |
-| `(app)`     | `/customers`          | Customer directory                                                                  |
-| `(app)`     | `/customers/[id]`     | Customer profile/history                                                            |
-| `(app)`     | `/services`           | Service catalog management                                                          |
-| `(app)`     | `/settings/business`  | Business setup                                                                      |
-| `(app)`     | `/settings/knowledge` | Business knowledge entries                                                          |
-| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                  |
-| `(admin)`   | `/admin/team`         | Team management                                                                     |
-| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)                                                 |
+| Route group | Screen                | Purpose                                                                                                                     |
+| ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `(auth)`    | `/sign-in`            | Login                                                                                                                       |
+| `(auth)`    | invitation acceptance | Accept invitation, set password, activate account (service foundation implemented — Prompt 10, PROMPT-03/04/05; UI planned) |
+| `(app)`     | `/onboarding`         | Business onboarding wizard (after ADMIN activation)                                                                         |
+| `(app)`     | `/`                   | Dashboard                                                                                                                   |
+| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions                                                                                    |
+| `(app)`     | `/conversations`      | Thread list                                                                                                                 |
+| `(app)`     | `/conversations/[id]` | Thread view + staff reply                                                                                                   |
+| `(app)`     | `/customers`          | Customer directory                                                                                                          |
+| `(app)`     | `/customers/[id]`     | Customer profile/history                                                                                                    |
+| `(app)`     | `/services`           | Service catalog management                                                                                                  |
+| `(app)`     | `/settings/business`  | Business setup                                                                                                              |
+| `(app)`     | `/settings/knowledge` | Business knowledge entries                                                                                                  |
+| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                                                          |
+| `(admin)`   | `/admin/team`         | Team management                                                                                                             |
+| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)                                                                                         |
 
 Route groups/layouts already exist; individual screens land prompt-by-prompt.
 The public `/sign-up` route exists today as a placeholder only and is no

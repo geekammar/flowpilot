@@ -2,11 +2,13 @@
 
 Invitation workflow foundation (DECISIONS #22): secure creation (token
 generation + hash-only persistence), business-scoped listing,
-revocation, and one-time token-based acceptance. Account activation,
-password setup, and delivery are later prompts. No UI here yet — the
-future Team management screen composes the creation side of this
-feature at the route layer, and the future acceptance/activation flow
-composes `acceptInvitation`.
+revocation, one-time token-based acceptance, and ADMIN account
+activation (PROMPT-05) — connecting an accepted ADMIN invitation to a
+Better Auth identity with Business ADMIN membership. Delivery and all
+UI are later prompts. No UI here yet — the future Team management
+screen composes the creation side of this feature at the route layer,
+and the future activation flow composes `acceptInvitation` +
+`activateAdminAccount`.
 
 ## Isolation rules
 
@@ -28,3 +30,14 @@ composes `acceptInvitation`.
   successful acceptance; every later or concurrent attempt fails with
   a typed invalid-state error.
 - Acceptance results exclude both the raw token and the token hash.
+- Activation is ADMIN-only, requires prior acceptance, and is one-time:
+  the conditional `activatedAt` guard makes repeated and concurrent
+  attempts fail with `ACCOUNT_ALREADY_ACTIVATED`.
+- Activation never creates a second identity for an email, never resets
+  an existing password, and never silently changes a role; conflicting
+  identities (other Business, same-Business STAFF) are rejected with
+  `ACCOUNT_CONFLICT`.
+- Passwords belong to Better Auth (`auth.api.signUpEmail` via the
+  injectable identity creator); they are never hashed, stored, logged,
+  or returned by this feature. Activation results carry safe data only
+  (no raw token, no hash, no password, no session token).

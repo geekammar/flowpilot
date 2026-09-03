@@ -75,8 +75,10 @@ prisma/                     # schema.prisma + seed.ts
 ## Authentication & Authorization Model
 
 > Locked in Prompt 09 (Auth & User Management Architecture Alignment).
-> Binding decision: `DECISIONS.md` #22. Target model — implementation is a
-> separate, explicitly-scoped prompt.
+> Binding decision: `DECISIONS.md` #22. Implementation lands
+> prompt-by-prompt: the invitation foundation and ADMIN account
+> activation exist at the service layer; platform identity and UI are
+> pending.
 
 **One authentication system.** Better Auth is the single authentication
 layer for ALL human users — Platform Operators, Business ADMINs, and
@@ -141,9 +143,13 @@ acquisition/provisioning mode after PMF.
 10. Do NOT introduce organizations/membership frameworks unless later
     evidence requires them.
 
-Target conceptual account model, Invitation model, and lifecycles:
-`DATABASE.md → Target Authorization / Invitation Model` (planned, not yet
-implemented).
+Conceptual account model, Invitation model, and lifecycles:
+`DATABASE.md → Target Authorization / Invitation Model`. Implementation
+status: the Invitation model, creation, acceptance, and ADMIN account
+activation (Better Auth identity + Business ADMIN membership) are
+implemented at the service layer; the Platform Operator identity /
+platform-level marker (`accountType` discriminator) and all
+invitation/activation UI remain planned.
 
 ## Database Philosophy
 

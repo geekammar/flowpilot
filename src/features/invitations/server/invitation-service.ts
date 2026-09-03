@@ -1,13 +1,15 @@
-import type { Invitation } from "@/generated/prisma/client";
+import type { Invitation, UserRole } from "@/generated/prisma/client";
 
 import {
   acceptInvitationInputSchema,
+  activateAdminAccountInputSchema,
   createInvitationInputSchema,
   listInvitationsInputSchema,
   revokeInvitationInputSchema,
 } from "@/features/invitations/schemas/invitation-schema";
 import type {
   AcceptInvitationSuccess,
+  ActivateAdminAccountSuccess,
   CreateInvitationSuccess,
   InvitationErrorCode,
   InvitationListItem,
@@ -16,33 +18,44 @@ import type {
   ListInvitationsSuccess,
   RevokeInvitationSuccess,
 } from "@/features/invitations/types";
+import { auth } from "@/lib/auth";
 import {
   businessRepository,
   invitationRepository,
+  userRepository,
 } from "@/server/repositories";
 import type { BusinessRepository } from "@/server/repositories/business.repository";
-import type { InvitationRepository } from "@/server/repositories/invitation.repository";
+import type {
+  ActivateInvitedAdminOutcome,
+  InvitationRepository,
+} from "@/server/repositories/invitation.repository";
+import { InvitationActivationConflictError } from "@/server/repositories/invitation.repository";
+import type { UserRepository } from "@/server/repositories/user.repository";
 import {
   generateInvitationToken,
   hashInvitationToken,
 } from "@/server/security/invitation-token";
 
+import { APIError } from "better-auth/api";
+
 /**
- * Invitation creation + acceptance foundation (DECISIONS #22 / #23):
- * secure token creation (hash-only persistence), business-scoped
- * listing, revocation, and one-time token-based acceptance. Account
- * activation and delivery are later prompts — acceptance only marks
- * the invitation accepted; it never creates a User, password, or
- * session.
+ * Invitation creation + acceptance + ADMIN account activation
+ * (DECISIONS #22 / #23): secure token creation (hash-only
+ * persistence), business-scoped listing, revocation, one-time
+ * token-based acceptance, and activation of an accepted ADMIN
+ * invitation into a real Better Auth identity with Business ADMIN
+ * membership. Delivery is a later prompt; there is no UI here.
  *
  * Security invariants:
  * - The raw token is generated here and returned ONCE in the creation
  *   result. It is never persisted, logged, or included in errors.
- * - Acceptance hashes the caller's raw token with the existing
- *   security utility and locates the invitation by `tokenHash` only.
+ * - Acceptance/activation hash the caller's raw token with the existing
+ *   security utility and locate the invitation by `tokenHash` only.
  * - Everything returned to callers excludes `tokenHash`.
- * - Creation/revocation are business-scoped; acceptance is
+ * - Creation/revocation are business-scoped; acceptance/activation are
  *   token-scoped by design (the caller is not yet authenticated).
+ * - Activation never creates a second identity for an email, never
+ *   resets an existing password, and never silently changes a role.
  *
  * Repository collaborators are injectable (defaulting to the app
  * singletons) so the workflow logic can be verified without a live
@@ -62,14 +75,21 @@ export function invitationExpiresAt(from: Date = new Date()): Date {
 
 /**
  * Derived lifecycle status (no persisted enum). Precedence:
- * accepted > revoked > expired > pending. `expiresAt <= now` means
- * expired; "open" invitations are exactly the PENDING ones.
+ * accepted (activated) > accepted > revoked > expired > pending.
+ * `expiresAt <= now` means expired; "open" invitations are exactly the
+ * PENDING ones. ACTIVATED = accepted + account activation completed
+ * (`activatedAt` set exactly once by the activation workflow).
  */
 export function deriveInvitationStatus(
-  invitation: Pick<Invitation, "acceptedAt" | "revokedAt" | "expiresAt">,
+  invitation: Pick<
+    Invitation,
+    "acceptedAt" | "revokedAt" | "expiresAt" | "activatedAt"
+  >,
   now: Date = new Date(),
 ): InvitationListItem["status"] {
-  if (invitation.acceptedAt) return "ACCEPTED";
+  if (invitation.acceptedAt) {
+    return invitation.activatedAt ? "ACTIVATED" : "ACCEPTED";
+  }
   if (invitation.revokedAt) return "REVOKED";
   if (invitation.expiresAt.getTime() <= now.getTime()) return "EXPIRED";
   return "PENDING";
@@ -84,6 +104,7 @@ function toView(invitation: Invitation): InvitationView {
     expiresAt: invitation.expiresAt,
     acceptedAt: invitation.acceptedAt,
     revokedAt: invitation.revokedAt,
+    activatedAt: invitation.activatedAt,
     invitedById: invitation.invitedById,
     createdAt: invitation.createdAt,
     updatedAt: invitation.updatedAt,
@@ -111,6 +132,58 @@ function failure(code: InvitationErrorCode, message: string) {
   return { success: false as const, error: { code, message } };
 }
 
+/**
+ * Outcome of the identity-creation dependency. `EXISTS` is a race-safe
+ * signal (identity appeared between the pre-check and creation); the
+ * workflow re-reads and classifies it — it never creates a duplicate.
+ */
+export type CreateIdentityResult =
+  | { status: "CREATED"; userId: string }
+  | { status: "EXISTS" }
+  | { status: "INVALID_PASSWORD" }
+  | { status: "FAILED" };
+
+/**
+ * Narrow boundary to Better Auth for email/password identity creation.
+ * The default implementation uses the installed version's official
+ * server-side endpoint (`auth.api.signUpEmail`) — Better Auth owns the
+ * password hash, the credential account row, and any session. Only the
+ * safe `user.id` crosses back into the domain; the session token is
+ * discarded and never logged.
+ */
+export type IdentityCreator = (input: {
+  email: string;
+  name: string;
+  password: string;
+}) => Promise<CreateIdentityResult>;
+
+const defaultCreateIdentity: IdentityCreator = async (input) => {
+  try {
+    const result = await auth.api.signUpEmail({
+      body: {
+        email: input.email,
+        name: input.name,
+        password: input.password,
+      },
+    });
+    return { status: "CREATED", userId: result.user.id };
+  } catch (error) {
+    if (error instanceof APIError) {
+      const code = error.body?.code;
+      if (
+        code === "USER_ALREADY_EXISTS" ||
+        code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
+      ) {
+        return { status: "EXISTS" };
+      }
+      if (code === "PASSWORD_TOO_SHORT" || code === "PASSWORD_TOO_LONG") {
+        return { status: "INVALID_PASSWORD" };
+      }
+    }
+    return { status: "FAILED" };
+  }
+};
+
 /** Narrow repository surface the service depends on (injectable). */
 export type InvitationServiceDeps = Readonly<{
   invitations: Pick<
@@ -121,13 +194,18 @@ export type InvitationServiceDeps = Readonly<{
     | "revoke"
     | "findByTokenHash"
     | "acceptPendingInvitation"
+    | "activateInvitedAdmin"
   >;
   businesses: Pick<BusinessRepository, "findById">;
+  users: Pick<UserRepository, "findByEmail">;
+  createIdentity: IdentityCreator;
 }>;
 
 const defaultDeps: InvitationServiceDeps = {
   invitations: invitationRepository,
   businesses: businessRepository,
+  users: userRepository,
+  createIdentity: defaultCreateIdentity,
 };
 
 /**
@@ -257,7 +335,8 @@ export async function revokeInvitation(
  * Classifies a located invitation that is no longer acceptable.
  * Distinct codes (already accepted / revoked / expired) are safe to
  * reveal only because the caller already presented the valid token;
- * an unknown token never reaches this helper.
+ * an unknown token never reaches this helper. An ACTIVATED invitation
+ * was necessarily accepted first.
  */
 function classifyUnacceptableInvitation(
   invitation: Invitation,
@@ -265,6 +344,7 @@ function classifyUnacceptableInvitation(
   const status = deriveInvitationStatus(invitation);
   switch (status) {
     case "ACCEPTED":
+    case "ACTIVATED":
       return failure(
         "INVITATION_ALREADY_ACCEPTED",
         "تم قبول هذه الدعوة بالفعل",
@@ -340,4 +420,199 @@ export async function acceptInvitation(
   }
 
   return { success: true, data: { invitation: toView(accepted) } };
+}
+
+/**
+ * Classifies an existing identity found for the invitation email.
+ * Safe to link (returns the userId) only when the identity belongs to
+ * no Business (never-assigned — the interrupted-activation recovery
+ * path) or is already ADMIN of the invitation's own Business
+ * (idempotent resume). Everything else is a typed conflict — the
+ * identity is never silently moved or promoted.
+ */
+function classifyExistingUser(
+  user: { id: string; businessId: string | null; role: UserRole },
+  invitation: Invitation,
+): { userId: string } | { failure: ReturnType<typeof failure> } {
+  if (user.businessId !== null && user.businessId !== invitation.businessId) {
+    return {
+      failure: failure(
+        "ACCOUNT_CONFLICT",
+        "هذا البريد مرتبط بحساب في منشأة أخرى",
+      ),
+    };
+  }
+  if (user.businessId === invitation.businessId && user.role !== "ADMIN") {
+    return {
+      failure: failure(
+        "ACCOUNT_CONFLICT",
+        "هذا البريد مرتبط بالمنشأة بدور مختلف",
+      ),
+    };
+  }
+  return { userId: user.id };
+}
+
+/**
+ * Activates the ADMIN account of an ACCEPTED invitation by RAW token.
+ *
+ * Flow: validate → hash (existing security utility) → locate by
+ * tokenHash → enforce eligibility (ADMIN role, accepted, not revoked,
+ * not yet activated; expiry only gates PENDING invitations — the
+ * acceptance already ran inside the validity window) → handle identity
+ * collisions → create the Better Auth identity when none exists →
+ * atomically mark the invitation activated and attach the Business
+ * ADMIN membership → return the safe activation result.
+ *
+ * Security properties:
+ * - Token-scoped, like acceptance: the persisted invitation is the
+ *   sole authority for businessId/email/role — callers cannot override
+ *   them (Zod strips every unknown key).
+ * - One identity per email: an existing identity is never duplicated,
+ *   its password is never reset, and its role is never silently
+ *   changed. STAFF members and other-Business users get a typed
+ *   conflict.
+ * - One activation per invitation: the repository's conditional
+ *   `activatedAt` guard makes repeated and concurrent attempts fail
+ *   with ACCOUNT_ALREADY_ACTIVATED.
+ * - Interrupted activations are resumable: if the identity exists but
+ *   the membership was never attached (crash between the two phases),
+ *   a retry completes the membership without creating a second
+ *   identity and without touching the existing password.
+ * - The result carries safe data only — never the raw token, the hash,
+ *   the password, or any session token.
+ */
+export async function activateAdminAccount(
+  input: unknown,
+  deps: InvitationServiceDeps = defaultDeps,
+): Promise<InvitationServiceResult<ActivateAdminAccountSuccess>> {
+  const parsed = activateAdminAccountInputSchema.safeParse(input);
+  if (!parsed.success) return invalidInput(parsed.error.issues);
+
+  const tokenHash = hashInvitationToken(parsed.data.token);
+
+  const invitation = await deps.invitations.findByTokenHash(tokenHash);
+  if (!invitation) {
+    return failure(
+      "INVITATION_NOT_FOUND",
+      "الدعوة غير موجودة أو الرمز غير صالح",
+    );
+  }
+
+  // Revocation is checked first — even for an impossible
+  // accepted-and-revoked record, a revoked invitation never activates.
+  if (invitation.revokedAt) {
+    return failure("INVITATION_REVOKED", "تم إلغاء هذه الدعوة");
+  }
+
+  switch (deriveInvitationStatus(invitation)) {
+    case "EXPIRED":
+      return failure("INVITATION_EXPIRED", "انتهت صلاحية هذه الدعوة");
+    case "PENDING":
+      return failure(
+        "INVITATION_NOT_ACCEPTED",
+        "يجب قبول الدعوة أولاً قبل تفعيل الحساب",
+      );
+    case "ACTIVATED":
+      return failure("ACCOUNT_ALREADY_ACTIVATED", "تم تفعيل هذا الحساب بالفعل");
+  }
+  if (invitation.role !== "ADMIN") {
+    return failure("ROLE_NOT_ALLOWED", "تفعيل الحساب متاح لدور المدير فقط");
+  }
+
+  // ── Identity collision handling (one identity per email) ──
+  let userId: string;
+  let identityCreated: boolean;
+  const existing = await deps.users.findByEmail(invitation.email);
+  if (existing) {
+    const classified = classifyExistingUser(existing, invitation);
+    if ("failure" in classified) return classified.failure;
+    userId = classified.userId;
+    identityCreated = false;
+  } else {
+    const created = await deps.createIdentity({
+      email: invitation.email,
+      name: parsed.data.name,
+      password: parsed.data.password,
+    });
+    switch (created.status) {
+      case "INVALID_PASSWORD":
+        return failure(
+          "INVALID_INPUT",
+          "كلمة المرور لا تفي بالحد الأدنى المطلوب",
+        );
+      case "FAILED":
+        return failure(
+          "IDENTITY_CREATION_FAILED",
+          "تعذر إنشاء حساب الدخول الآن",
+        );
+      case "EXISTS": {
+        // Race: the identity appeared between the pre-check and the
+        // creation attempt. Re-read and classify — resume when safely
+        // attachable, typed conflict otherwise. Never a duplicate.
+        const raced = await deps.users.findByEmail(invitation.email);
+        if (!raced) {
+          return failure(
+            "IDENTITY_CREATION_FAILED",
+            "تعذر إنشاء حساب الدخول الآن",
+          );
+        }
+        const classified = classifyExistingUser(raced, invitation);
+        if ("failure" in classified) return classified.failure;
+        userId = classified.userId;
+        identityCreated = false;
+        break;
+      }
+      case "CREATED":
+        userId = created.userId;
+        identityCreated = true;
+        break;
+    }
+  }
+
+  // ── Atomic activation: invitation mark + Business ADMIN membership ──
+  let outcome: ActivateInvitedAdminOutcome;
+  try {
+    outcome = await deps.invitations.activateInvitedAdmin({
+      invitationId: invitation.id,
+      userId,
+      businessId: invitation.businessId,
+    });
+  } catch (error) {
+    if (error instanceof InvitationActivationConflictError) {
+      return failure(
+        "ACCOUNT_CONFLICT",
+        "هذا الحساب غير متاح للتفعيل لهذه المنشأة",
+      );
+    }
+    return failure("PERSISTENCE_FAILED", "تعذر تفعيل الحساب الآن");
+  }
+
+  switch (outcome.status) {
+    case "ACTIVATED":
+      return {
+        success: true,
+        data: {
+          invitation: toView(outcome.invitation),
+          userId: outcome.userId,
+          identityCreated,
+        },
+      };
+    case "ALREADY_ACTIVATED":
+      return failure("ACCOUNT_ALREADY_ACTIVATED", "تم تفعيل هذا الحساب بالفعل");
+    case "NOT_ACCEPTED":
+      return failure(
+        "INVITATION_NOT_ACCEPTED",
+        "يجب قبول الدعوة أولاً قبل تفعيل الحساب",
+      );
+    case "CONFLICT":
+      return failure(
+        "ACCOUNT_CONFLICT",
+        "هذا الحساب غير متاح للتفعيل لهذه المنشأة",
+      );
+    default:
+      // USER_MISSING / NOT_FOUND: the row state changed mid-transaction —
+      // a persistence anomaly, reported without internals.
+      return failure("PERSISTENCE_FAILED", "تعذر تفعيل الحساب الآن");
+  }
 }
