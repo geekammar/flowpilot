@@ -3,6 +3,7 @@ import {
   Bot,
   CalendarCheck2,
   CircleCheck,
+  CirclePause,
   CircleQuestionMark,
   CircleX,
   Clock,
@@ -27,7 +28,9 @@ export type StatusValue =
   | "need-human"
   | "ai-active"
   | "booked"
-  | "incomplete";
+  | "incomplete"
+  | "active"
+  | "inactive";
 
 export type StatusDefinition = {
   value: StatusValue;
@@ -115,6 +118,18 @@ export const STATUSES: Record<StatusValue, StatusDefinition> = {
     labelAr: "غير مكتملة",
     tone: "warning",
     icon: CircleQuestionMark,
+  },
+  active: {
+    value: "active",
+    labelAr: "نشطة",
+    tone: "success",
+    icon: CircleCheck,
+  },
+  inactive: {
+    value: "inactive",
+    labelAr: "متوقفة",
+    tone: "neutral",
+    icon: CirclePause,
   },
 };
 

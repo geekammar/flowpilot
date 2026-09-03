@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-07 —
-> Onboarding UX Completion).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-08 —
+> Services Management Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -29,8 +29,8 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Invitation acceptance foundation (service layer)             | ✅ complete (PROMPT-04)                |
 | ADMIN account activation (Better Auth + membership)          | ✅ complete (PROMPT-05, service layer) |
 | Activation → onboarding integration                          | ✅ complete (PROMPT-06)                |
-| Customers directory                                          | ⏳ placeholder (next — PROMPT-07)      |
-| Services management                                          | ⏳ placeholder                         |
+| Services management (PROMPT-08)                              | ✅ complete                            |
+| Customers directory                                          | ⏳ placeholder (oldest remaining)      |
 | Business settings / knowledge screens                        | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
 | Staff area                                                   | ⏳ placeholder                         |
@@ -57,9 +57,16 @@ restructured in PROMPT-07 into the 4-step operational-foundation wizard
 إعدادات الحجز الأساسية → مراجعة وتشغيل) with smart resume, step-order
 guards, a review summary, and a server-side completion guard over the
 step data only — services/knowledge management moved out of onboarding
-into their own upcoming Spec A screens. Not yet implemented: token
-delivery, invitation creation UI (Team management), and the STAFF
-activation workflow.
+into their own upcoming Spec A screens. Services management is now
+implemented (PROMPT-08): `/services` with list/create/edit/activate/
+deactivate, ADMIN-only + tenant-scoped in the service layer, the
+Business always derived from the session, a small shared create/edit
+dialog, active/inactive canonical statuses, empty/loading/error
+states, and role-scoped navigation — zero schema changes (the existing
+Service model/repository/validation were sufficient; inactive services
+remain excluded from booking selection paths). Not yet implemented:
+token delivery, invitation creation UI (Team management), and the
+STAFF activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -157,11 +164,20 @@ activation`); the tag is pushed to origin and the GitHub Release
   `DATABASE_URL` (device-local, user action) and was not used, per
   the operator's instruction for operations-only publication.
 - **v0.6.0 — Onboarding UX Completion: PUBLISHED** (2026-09-03,
-  PROMPT-07 — current Latest release). Annotated tag `v0.6.0` points at
-  the PROMPT-07 commit (`feat(onboarding): improve business onboarding
-experience`); the tag is pushed to origin and the GitHub Release
-  "FlowPilot v0.6.0 — Onboarding UX Completion" exists. Published
-  through the documented GitHub publication workflow (PROMPT-05A/06
+  PROMPT-07). Annotated tag `v0.6.0` points at the PROMPT-07 commit
+  (`feat(onboarding): improve business onboarding experience`); the tag
+  is pushed to origin and the GitHub Release "FlowPilot v0.6.0 —
+  Onboarding UX Completion" exists. Published through the documented
+  GitHub publication workflow (PROMPT-05A/06 pattern); the legacy
+  `pnpm release` doctor gate still blocks on this device's placeholder
+  `DATABASE_URL` (device-local, user action) and was not used, per the
+  operator's instruction.
+- **v0.7.0 — Services Management Foundation: PUBLISHED** (2026-09-03,
+  PROMPT-08 — current Latest release). Annotated tag `v0.7.0` points at
+  the PROMPT-08 commit (`feat(services): add services management
+foundation`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.7.0 — Services Management Foundation" exists. Published
+  through the documented GitHub publication workflow (PROMPT-05A/06/07
   pattern); the legacy `pnpm release` doctor gate still blocks on this
   device's placeholder `DATABASE_URL` (device-local, user action) and
   was not used, per the operator's instruction.
@@ -180,12 +196,11 @@ experience`); the tag is pushed to origin and the GitHub Release
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: services management screen
-(PROMPT-07 removed service creation from onboarding, raising its
-priority) or customers directory — next prompt decided by the operator —
-then staff area → settings → team, which includes the STAFF
-invitation/activation UX and composes the existing invitation
-services). Spec A exit criteria live in `ROADMAP.md`.
+**Finish Spec A first** (recommended order: customers directory — the
+oldest remaining placeholder — then staff area → settings → team, which
+includes the STAFF invitation/activation UX and composes the existing
+invitation services; next prompt decided by the operator). Spec A exit
+criteria live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

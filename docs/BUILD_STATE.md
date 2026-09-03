@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-07 (Onboarding UX Completion).
+> Last updated: PROMPT-08 (Services Management Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -2008,6 +2008,146 @@ complete`) now 404 — no external links reference them (verified by
 
 ---
 
+## PROMPT-08 — Services Management Foundation
+
+**Status:** ✅ Complete
+
+> Operator prompt: SERVICES MANAGEMENT FOUNDATION. List / create / edit /
+> activate / deactivate services for the current Business — generic
+> (vertical-agnostic), Arabic-first, RTL, mobile-first, ADMIN-only,
+> tenant-scoped. Zero schema changes (the existing Service model,
+> repository, and validation contract already covered everything).
+
+### ALREADY IMPLEMENTED (reused, untouched)
+
+- `Service` Prisma model (name, description?, durationMinutes, isActive,
+  soft delete, businessId + tenant indexes) — no migration needed
+- `ServiceRepository` (listByBusiness with includeInactive, create,
+  update, setActive, findById with deletedAt filter)
+- Shared service validation contract (`@/lib/validation/service.ts`:
+  name 2–120, optional description ≤2000, duration 5–480 int, Arabic
+  messages)
+- Guards (`requireUser` / `requireRole`), AppShell, PageHeader,
+  EmptyState, StatusBadge, page-skeleton, Dialog primitive
+- Inactive-service exclusion from booking paths (appointment form
+  options list active services only; `createAppointment` re-checks
+  `isActive`) — pre-existing and verified, not rebuilt
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **Service management workflow**
+  (`src/features/services/server/service-service.ts`): list / create /
+  update / activate / deactivate with the authorization rules inside —
+  ADMIN-only (`resolveBusiness` guard on every operation), tenant
+  scoping to the actor's Business, cross-Business service ids rejected
+  as not-found, typed Arabic failures without internals. Repository
+  collaborators injectable (invitations-feature pattern) so the logic
+  is verifiable without a live database.
+- **Server actions** (`service-actions.ts`): thin `"use server"`
+  wrappers that build the actor from the authenticated session + DB
+  user (Business ALWAYS derived server-side; no client-provided
+  businessId can override it) and revalidate `/services` +
+  `/appointments/new` after mutations.
+- **`/services` screen** (`(app)/services/page.tsx` + `loading.tsx`):
+  ADMIN-only page guard (`requireRole("ADMIN")` → STAFF redirected),
+  session-derived Business, layout-matched loading skeleton with
+  Arabic announcement.
+- **Services list UI** (`services-screen.tsx`): mobile-first cards
+  (name, active/inactive StatusBadge, duration in minutes,
+  description when present), Arabic count via `SERVICE_NOUNS`, one
+  primary action (إضافة خدمة), optimistic activate/deactivate with
+  rollback, actionable EmptyState, inline `role="alert"` errors.
+- **Create/edit dialog** (`service-form-dialog.tsx`): the same small
+  form for both modes (اسم الخدمة، وصف الخدمة اختياري، مدة الخدمة) —
+  prefilled for edit, remounted per open via key (no wizard), RHF +
+  Zod with Arabic messages incl. an Arabic message for empty duration
+  input, حفظ الخدمة / إلغاء actions.
+- **Canonical status registry**: `active` (نشطة) / `inactive` (متوقفة)
+  added to `src/lib/status.ts` (same additive-extension pattern as
+  BOOKED/INCOMPLETE/COMPLETED) — rendered through the shared
+  StatusBadge.
+- **Navigation & discoverability**: `الخدمات` added to APP_NAV_ITEMS
+  with a `roles: ["ADMIN"]` constraint; `(app)` layout filters nav
+  items by session role (visibility only — server guards stay the
+  authorization boundary); dashboard quick action "إدارة الخدمات"
+  added (dashboard is ADMIN-only — STAFF redirects to `/staff`).
+
+### NOT IMPLEMENTED (later prompts — per Spec A)
+
+- Deletion UI (soft-delete exists in the repository; Spec A §4 needs
+  only CRUD + toggle) and any pricing/packages/staff-assignment/
+  vertical metadata (explicitly out of scope).
+
+### Generated / Changed Files
+
+`src/features/services/{types.ts,schemas/service-schema.ts,server/
+service-service.ts,actions/service-actions.ts,components/
+{services-screen,service-form-dialog}.tsx,README.md}`,
+`src/app/(app)/services/{page,loading}.tsx`; updated
+`src/lib/status.ts` (active/inactive), `src/lib/arabic.ts`
+(SERVICE_NOUNS), `src/lib/app-config.ts` (roles-scoped nav item),
+`src/components/shared/layout/nav-icons.tsx` (layers icon),
+`src/app/(app)/layout.tsx` (role-based nav filtering),
+`src/features/dashboard/components/quick-actions.tsx` (services link),
+`package.json` (version → 0.7.0). No schema/migration changes.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..07 pattern): **51/51 checks passed** offline with
+  in-memory repository stand-ins running the REAL service workflow +
+  schemas, plus source-level checks — schema rejections (NaN duration
+  with Arabic message, duration <5/>480/non-integer, short/empty name,
+  empty optional description valid, hostile extra keys stripped,
+  non-UUID id); STAFF blocked from all four operations with zero
+  writes; ADMIN without business rejected; own-business listing
+  including inactive, excluding other businesses + soft-deleted;
+  create with actor's businessId (client businessId never honored);
+  edit updates values + clears description; deactivate/reactivate;
+  cross-business edit/toggle rejected with zero writes; unknown +
+  soft-deleted ids not-found; persistence failure typed without
+  internals; booking-selection paths exclude inactive (appointment
+  options, createAppointment isActive check, repository filter);
+  page/action guards + revalidation; Arabic labels/empty/loading/
+  error states; ADMIN-scoped nav; no physical left/right CSS in the
+  new components.
+- `pnpm verify` full gate: PASSED ✅ (lint 217.6s · typecheck 62.3s ·
+  format 37.1s · build --webpack 238.0s) — `/services` compiled as a
+  dynamic route
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated):
+  live-database behavior (this device has a placeholder
+  `DATABASE_URL`; the workflow runs against injectable repositories,
+  and the real-DB path is the existing, already-used repository
+  methods). No migration was created or needed, so there is nothing
+  to apply from desktop/CI for this prompt.
+
+### Known Limitations
+
+- Deactivate/reactivate is a one-tap explicit action without a
+  confirmation dialog — matching the existing appointments status-
+  transition convention; it is fully reversible and optimistically
+  rolled back on server rejection.
+- Service name max-length (120) carries Zod's default (non-Arabic)
+  message from the pre-existing shared contract — left untouched
+  (changing shared validation was out of scope).
+- The list caps at 100 services per page (shared pagination contract)
+  — no pagination UI yet; pilot-scale acceptable.
+
+### Release
+
+- Commit `feat(services): add services management foundation`;
+  `package.json` version bumped to 0.7.0 (MINOR — new user-facing
+  product capability; `/api/health` reports the version).
+- Annotated tag `v0.7.0` — Services Management Foundation — points at
+  the PROMPT-08 commit. Published through the documented GitHub
+  publication workflow (PROMPT-05A/06/07 pattern); the legacy
+  `pnpm release` doctor gate still blocks on this device's placeholder
+  `DATABASE_URL` (device-local, user action) and was not used, per the
+  operator's prompt instruction.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
@@ -2015,11 +2155,13 @@ complete`) now 404 — no external links reference them (verified by
   العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
   capture, smart resume, step guards, and a real review step; services/
   knowledge deferred to their own screens), owner dashboard,
-  Conversations, Appointments, and a full polish pass (loading/error/
-  empty states, a11y, PWA PNG icons, demo-ready seed) are complete.
-  Still placeholders: Customers directory, Services management, Business
-  settings/knowledge screens, Team management (admin), and the Staff area.
-  (The `/sign-up` placeholder page remains in code but is no longer a
+  Conversations, Appointments, a full polish pass (loading/error/
+  empty states, a11y, PWA PNG icons, demo-ready seed), and Services
+  management (PROMPT-08: list/create/edit/activate/deactivate,
+  ADMIN-only, tenant-scoped, zero schema changes) are complete. Still
+  placeholders: Customers directory, Business settings/knowledge
+  screens, Team management (admin), and the Staff area. (The
+  `/sign-up` placeholder page remains in code but is no longer a
   planned deliverable — superseded by the invitation-first model; the
   invitation foundation, acceptance, ADMIN account activation, and the
   ADMIN activation UI → onboarding handoff now exist, but invitation
@@ -2121,12 +2263,17 @@ password}` input and typed Arabic error mapping, safe sign-in →
   `docs/DOCS_INDEX.md`, Tier 3 historical preserved. No product code or
   canonical documentation content changed; stale status claims in
   PRODUCT_GLOSSARY / PROJECT_README corrected.
+- **Services management foundation (PROMPT-08) complete:** `/services`
+  screen with list/create/edit/activate/deactivate (small create/edit
+  dialog, Arabic-first/RTL/mobile-first cards, active/inactive status
+  badges, empty/loading/error states), ADMIN-only with tenant scoping
+  enforced in the service layer, session-derived Business on every
+  operation, and role-scoped navigation. Zero schema changes — the
+  existing Service model/repository/validation were sufficient.
 - **Next Step:** the next product prompt is decided by the operator from
-  this updated state. Natural Spec A candidates: **Services management
-  screen** (PROMPT-07 removed service creation from onboarding, raising
-  its priority — a newly onboarded business cannot add services through
-  the UI until it exists) and **Customers Directory** (Spec A §11). Do
-  NOT combine unrelated areas. Then staff area → settings → team (team
-  includes the STAFF invitation/activation UX composing the existing
-  invitation services).
+  this updated state. Natural Spec A candidates: **Customers Directory**
+  (Spec A §11 — now the oldest remaining placeholder) and **Business
+  settings/knowledge screens**. Do NOT combine unrelated areas. Then
+  staff area → team (team includes the STAFF invitation/activation UX
+  composing the existing invitation services).
 - After each prompt: update this file and `DECISIONS.md`.

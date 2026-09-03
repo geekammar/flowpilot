@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import {
   CalendarDaysIcon,
   CalendarPlusIcon,
+  LayersIcon,
   MessagesSquareIcon,
 } from "lucide-react";
 import Link from "next/link";
 
-// Only destinations that exist today. Services & team management arrive
-// with their own Spec A prompts.
+// Only destinations that exist today. Team management arrives with its
+// own Spec A prompt. The dashboard is ADMIN-only (STAFF is redirected),
+// so the services link needs no extra role gating here.
 const ACTIONS = [
   {
     href: "/appointments/new",
@@ -21,6 +23,7 @@ const ACTIONS = [
     icon: MessagesSquareIcon,
   },
   { href: "/appointments", label: "جدول اليوم", icon: CalendarDaysIcon },
+  { href: "/services", label: "إدارة الخدمات", icon: LayersIcon },
 ] as const;
 
 export function QuickActions() {
@@ -29,7 +32,7 @@ export function QuickActions() {
       <h2 id="quick-actions-heading" className="sr-only">
         إجراءات سريعة
       </h2>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {ACTIONS.map((action, index) => {
           const Icon = action.icon;
           return (

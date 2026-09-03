@@ -2,7 +2,7 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-07 (Onboarding UX Completion).
+> Last updated: 2026-09-03 — PROMPT-08 (Services Management Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -14,10 +14,13 @@
   مراجعة وتشغيل) with smart resume (`/onboarding` → first incomplete
   step / dashboard when completed), step-order guards, back-navigation,
   a real review summary, and a server-side completion guard (services/
-  knowledge deferred to their own later screens). Remaining
-  placeholders: customers, services, settings, team, staff area (the
-  `/sign-up` placeholder page remains in code but is no longer a planned
-  deliverable).
+  knowledge deferred to their own later screens). Services management
+  landed in PROMPT-08 (`/services`: list/create/edit/activate/
+  deactivate, ADMIN-only, tenant-scoped, small create/edit dialog,
+  active/inactive badges, empty/loading/error states — zero schema
+  changes). Remaining placeholders: customers, settings, team, staff
+  area (the `/sign-up` placeholder page remains in code but is no
+  longer a planned deliverable).
 - **Auth architecture alignment (Prompt 09) complete — documentation only:**
   invitation-first pilot account creation (Platform Operator provisions
   Business → invites ADMIN → activation → onboarding → ADMIN invites
@@ -74,6 +77,17 @@ Authentication & Authorization Model`.
   `@/lib/public-paths`. Still pending on this path: invitation
   creation/delivery UX (Team management) and the STAFF activation
   workflow.
+- **Services management foundation (PROMPT-08): ✅ implemented:**
+  `/services` screen (ADMIN-only, STAFF redirected; Business always
+  derived from the session) with mobile-first service cards (name,
+  optional description, duration in minutes, active/inactive status
+  badge), one primary action (إضافة خدمة), a small shared create/edit
+  dialog (prefilled for edit), explicit activate/deactivate with
+  optimistic rollback, actionable empty state, loading skeleton, and
+  Arabic error states. Authorization lives in the service layer
+  (ADMIN + tenant scoping on every operation; cross-Business ids
+  rejected as not-found); inactive services stay excluded from booking
+  selection paths. Vertical-agnostic; no pricing/packages/metadata.
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
@@ -110,13 +124,15 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   published on GitHub (2026-09-03, PROMPT-05A). v0.5.0 — ADMIN
   Activation → Onboarding Integration: published 2026-09-03 (PROMPT-06).
   v0.6.0 — Onboarding UX Completion: published 2026-09-03 (PROMPT-07,
-  via the documented GitHub publication workflow) — every tag is pushed
-  to origin and has a GitHub Release; v0.6.0 is the current Latest.
-  Local `main` and origin `main` are in sync (see `PROJECT_STATUS.md →
-Release Status`). Open user action: the repo is public but must be
-  private (GITHUB_WORKFLOW.md / DECISIONS #18).
+  via the documented GitHub publication workflow). v0.7.0 — Services
+  Management Foundation: published 2026-09-03 (PROMPT-08, same
+  workflow) — every tag is pushed to origin and has a GitHub Release;
+  v0.7.0 is the current Latest. Local `main` and origin `main` are in
+  sync (see `PROJECT_STATUS.md → Release Status`). Open user action:
+  the repo is public but must be private (GITHUB_WORKFLOW.md /
+  DECISIONS #18).
 - **Next step (product):** decided by the operator from the updated
-  BUILD_STATE — natural candidates: Services management screen (onboarding
-  no longer creates services, raising its priority) or Customers
-  Directory (Spec A §11); then staff area → settings → team.
+  BUILD_STATE — natural candidates: Customers Directory (Spec A §11,
+  the oldest remaining placeholder) or Business settings/knowledge
+  screens; then staff area → team.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ClipboardList,
   House,
+  Layers,
   MessageCircle,
   Shield,
   Users,
@@ -17,6 +18,7 @@ const ICONS: Record<string, LucideIcon> = {
   users: Users,
   shield: Shield,
   clipboard: ClipboardList,
+  layers: Layers,
 };
 
 export function getNavIcon(iconName: string): LucideIcon {

@@ -40,3 +40,11 @@ export const APPOINTMENT_NOUNS: ArabicCountNouns = {
   few: "مواعيد",
   many: "موعد",
 };
+
+export const SERVICE_NOUNS: ArabicCountNouns = {
+  zero: "لا توجد خدمات",
+  one: "خدمة واحدة",
+  two: "خدمتان",
+  few: "خدمات",
+  many: "خدمة",
+};

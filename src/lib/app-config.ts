@@ -3,6 +3,8 @@
  * Keep this file tiny — feature-specific config lives in features.
  */
 
+import type { UserRole } from "@/types/domain";
+
 export const APP_NAME = "FlowPilot";
 export const APP_DESCRIPTION =
   "نظام تحويل المواعيد عبر واتساب. حجز أكثر، متابعة أقل.";
@@ -14,6 +16,12 @@ export type NavItem = {
   href: string;
   label: string;
   icon: string;
+  /**
+   * Optional business-role restriction. Layouts filter out items the
+   * current user's role may not see — UI visibility only, never an
+   * authorization boundary (server guards stay authoritative).
+   */
+  roles?: UserRole[];
 };
 
 /** Main authenticated app navigation (generic — no vertical terminology). */
@@ -22,6 +30,7 @@ export const APP_NAV_ITEMS: NavItem[] = [
   { href: "/appointments", label: "المواعيد", icon: "calendar" },
   { href: "/conversations", label: "المحادثات", icon: "message" },
   { href: "/customers", label: "العملاء", icon: "users" },
+  { href: "/services", label: "الخدمات", icon: "layers", roles: ["ADMIN"] },
 ];
 
 /** Admin area navigation. */

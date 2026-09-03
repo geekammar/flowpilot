@@ -9,10 +9,17 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireUser();
+  const session = await requireUser();
+  // Role-scoped visibility for nav items that are ADMIN-only (e.g.
+  // services management) — the server guards remain the authorization
+  // boundary; this only keeps hidden screens out of STAFF navigation.
+  const navItems = APP_NAV_ITEMS.filter(
+    (item) =>
+      !item.roles || item.roles.some((role) => role === session.user.role),
+  );
 
   return (
-    <AppShell navItems={APP_NAV_ITEMS} header={<UserMenu />}>
+    <AppShell navItems={navItems} header={<UserMenu />}>
       {children}
       <InstallPrompt />
     </AppShell>
