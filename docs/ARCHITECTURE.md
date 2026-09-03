@@ -1,7 +1,8 @@
 # FlowPilot — Architecture
 
 > Technical architecture reference. Read together with `SPEC_A.md` and
-> `BUILD_STATE.md`. Last updated: Prompt 09 (auth model alignment).
+> `BUILD_STATE.md`. Last updated: PROMPT-06 (activation → onboarding
+> integration).
 
 ## Stack
 
@@ -76,9 +77,10 @@ prisma/                     # schema.prisma + seed.ts
 
 > Locked in Prompt 09 (Auth & User Management Architecture Alignment).
 > Binding decision: `DECISIONS.md` #22. Implementation lands
-> prompt-by-prompt: the invitation foundation and ADMIN account
-> activation exist at the service layer; platform identity and UI are
-> pending.
+> prompt-by-prompt: the invitation foundation, ADMIN account
+> activation, and the activation UI → onboarding handoff (PROMPT-06,
+> DECISIONS #25) exist; platform identity, invitation creation UI, and
+> the STAFF activation workflow are pending.
 
 **One authentication system.** Better Auth is the single authentication
 layer for ALL human users — Platform Operators, Business ADMINs, and
@@ -147,9 +149,12 @@ Conceptual account model, Invitation model, and lifecycles:
 `DATABASE.md → Target Authorization / Invitation Model`. Implementation
 status: the Invitation model, creation, acceptance, and ADMIN account
 activation (Better Auth identity + Business ADMIN membership) are
-implemented at the service layer; the Platform Operator identity /
-platform-level marker (`accountType` discriminator) and all
-invitation/activation UI remain planned.
+implemented at the service layer, and the ADMIN activation UI
+(`/invite/[token]`, composing acceptance + activation with a safe
+sign-in → onboarding handoff) is implemented (PROMPT-06); the Platform
+Operator identity / platform-level marker (`accountType`
+discriminator), invitation creation UI, token delivery, and the STAFF
+activation workflow remain planned.
 
 ## Database Philosophy
 

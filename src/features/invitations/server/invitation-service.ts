@@ -11,6 +11,7 @@ import type {
   AcceptInvitationSuccess,
   ActivateAdminAccountSuccess,
   CreateInvitationSuccess,
+  GetInvitationByTokenSuccess,
   InvitationErrorCode,
   InvitationListItem,
   InvitationServiceResult,
@@ -451,6 +452,56 @@ function classifyExistingUser(
     };
   }
   return { userId: user.id };
+}
+
+/**
+ * Read-only invitation lookup by RAW token for the activation screen
+ * (PROMPT-06). Performs NO mutation — the one-time acceptance runs at
+ * submit time, never on page load. Hashes the token with the existing
+ * security utility and locates the invitation by `tokenHash` only.
+ *
+ * Security properties:
+ * - Token-scoped like acceptance: the persisted invitation is the sole
+ *   authority for email/businessId/role.
+ * - Unknown/malformed tokens get the same generic not-found error as
+ *   acceptance — the message does not help differentiate token states.
+ * - The result excludes the raw token and the token hash; neither is
+ *   ever logged.
+ * - Distinct lifecycle states (accepted / revoked / expired) are safe
+ *   to reveal only because the caller already presented a valid token.
+ */
+export async function getInvitationByToken(
+  input: unknown,
+  deps: InvitationServiceDeps = defaultDeps,
+): Promise<InvitationServiceResult<GetInvitationByTokenSuccess>> {
+  const parsed = acceptInvitationInputSchema.safeParse(input);
+  if (!parsed.success) return invalidInput(parsed.error.issues);
+
+  const tokenHash = hashInvitationToken(parsed.data.token);
+
+  let invitation: Invitation | null;
+  try {
+    invitation = await deps.invitations.findByTokenHash(tokenHash);
+  } catch {
+    return failure("PERSISTENCE_FAILED", "تعذر تحميل الدعوة الآن");
+  }
+  if (!invitation) {
+    return failure(
+      "INVITATION_NOT_FOUND",
+      "الدعوة غير موجودة أو الرمز غير صالح",
+    );
+  }
+
+  const business = await deps.businesses.findById(invitation.businessId);
+
+  return {
+    success: true,
+    data: {
+      invitation: toView(invitation),
+      status: deriveInvitationStatus(invitation),
+      businessName: business?.name ?? null,
+    },
+  };
 }
 
 /**

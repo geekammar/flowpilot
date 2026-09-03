@@ -22,8 +22,9 @@ collect evidence.
   `ARCHITECTURE.md → Authentication & Authorization Model` and
   `DECISIONS.md` #22): the Platform Operator provisions the Business and
   invites the initial `ADMIN`; the invitee accepts and activates the account
-  (sets a password). Public self-sign-up is NOT the primary pilot flow — it
-  remains a possible future self-serve acquisition mode, and the
+  (sets a password) at `/invite/[token]` (implemented in PROMPT-06), then
+  completes onboarding. Public self-sign-up is NOT the primary pilot flow —
+  it remains a possible future self-serve acquisition mode, and the
   authentication architecture must not prevent it
 
 ### 2. Onboarding
@@ -33,8 +34,9 @@ collect evidence.
   about, working hours, cancellation policy)
 - Links the activated user as `ADMIN` of the business
 - Repeatable checklist pattern for pilot onboarding
-- The onboarding wizard implementation already exists; future work is to
-  refine/reconnect it with the invitation-based lifecycle (planned)
+- The onboarding wizard implementation exists and is now reconnected with
+  the invitation-based lifecycle (PROMPT-06: activation hands off through
+  sign-in to the wizard; the wizard area is ADMIN-only)
 
 ### 3. Business Setup
 
@@ -111,23 +113,23 @@ collect evidence.
 
 ## Screens (Included)
 
-| Route group | Screen                | Purpose                                                                                                                     |
-| ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `(auth)`    | `/sign-in`            | Login                                                                                                                       |
-| `(auth)`    | invitation acceptance | Accept invitation, set password, activate account (service foundation implemented — Prompt 10, PROMPT-03/04/05; UI planned) |
-| `(app)`     | `/onboarding`         | Business onboarding wizard (after ADMIN activation)                                                                         |
-| `(app)`     | `/`                   | Dashboard                                                                                                                   |
-| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions                                                                                    |
-| `(app)`     | `/conversations`      | Thread list                                                                                                                 |
-| `(app)`     | `/conversations/[id]` | Thread view + staff reply                                                                                                   |
-| `(app)`     | `/customers`          | Customer directory                                                                                                          |
-| `(app)`     | `/customers/[id]`     | Customer profile/history                                                                                                    |
-| `(app)`     | `/services`           | Service catalog management                                                                                                  |
-| `(app)`     | `/settings/business`  | Business setup                                                                                                              |
-| `(app)`     | `/settings/knowledge` | Business knowledge entries                                                                                                  |
-| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                                                          |
-| `(admin)`   | `/admin/team`         | Team management                                                                                                             |
-| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)                                                                                         |
+| Route group | Screen                | Purpose                                                                                                                    |
+| ----------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `(auth)`    | `/sign-in`            | Login                                                                                                                      |
+| `(auth)`    | `/invite/[token]`     | Invitation activation (PROMPT-06): accept + set password + activate, then hand off to onboarding via safe sign-in redirect |
+| `(app)`     | `/onboarding`         | Business onboarding wizard (after ADMIN activation; ADMIN-only guard)                                                      |
+| `(app)`     | `/`                   | Dashboard                                                                                                                  |
+| `(app)`     | `/appointments`       | Appointment list/agenda + detail actions                                                                                   |
+| `(app)`     | `/conversations`      | Thread list                                                                                                                |
+| `(app)`     | `/conversations/[id]` | Thread view + staff reply                                                                                                  |
+| `(app)`     | `/customers`          | Customer directory                                                                                                         |
+| `(app)`     | `/customers/[id]`     | Customer profile/history                                                                                                   |
+| `(app)`     | `/services`           | Service catalog management                                                                                                 |
+| `(app)`     | `/settings/business`  | Business setup                                                                                                             |
+| `(app)`     | `/settings/knowledge` | Business knowledge entries                                                                                                 |
+| `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                                                         |
+| `(admin)`   | `/admin/team`         | Team management                                                                                                            |
+| `(staff)`   | `/staff`              | Staff area shell (own agenda/tasks)                                                                                        |
 
 Route groups/layouts already exist; individual screens land prompt-by-prompt.
 The public `/sign-up` route exists today as a placeholder only and is no

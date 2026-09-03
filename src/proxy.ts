@@ -1,3 +1,5 @@
+import { isPublicPath } from "@/lib/public-paths";
+
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -7,27 +9,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * Two-tier protection model (see docs/DECISIONS.md #13):
  *  1. THIS file gates on session-cookie presence only — cheap, edge-friendly.
  *     Unauthenticated users are redirected to /sign-in before any render.
+ *     Public paths (auth screens, /api/health, /api/auth, and the
+ *     token-scoped invitation activation route /invite/<token>) are exempt:
+ *     the invitation token itself is the credential there and its lifecycle
+ *     is enforced by the invitation service, not by a session.
  *  2. Role checks (ADMIN/STAFF) and isActive validation run server-side in
  *     layout guards (`src/server/auth/guards.ts`) because sessions are
  *     DB-backed and cannot be fully verified here without a DB round-trip.
  */
-
-const PUBLIC_PATHS = [
-  "/sign-in",
-  "/sign-up",
-  "/forgot-password",
-  "/unauthorized",
-  "/access-denied",
-];
-
-function isPublic(pathname: string): boolean {
-  // /api/health is the public liveness probe (deployment validation).
-  return (
-    PUBLIC_PATHS.includes(pathname) ||
-    pathname === "/api/health" ||
-    pathname.startsWith("/api/auth")
-  );
-}
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -41,7 +30,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (hasSessionCookie || isPublic(pathname)) {
+  if (hasSessionCookie || isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

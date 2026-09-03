@@ -57,6 +57,18 @@ export type AcceptInvitationSuccess = {
 };
 
 /**
+ * Read-only invitation context for the activation screen (PROMPT-06):
+ * what the page may render before any mutation — the safe view, the
+ * derived lifecycle status, and the inviting Business display name.
+ * Never the raw token, never the hash.
+ */
+export type GetInvitationByTokenSuccess = {
+  invitation: InvitationView;
+  status: InvitationLifecycleStatus;
+  businessName: string | null;
+};
+
+/**
  * Safe activation result (PROMPT-05): the activated membership context
  * only. `identityCreated` distinguishes a freshly created Better Auth
  * identity from linking an existing one (interrupted-activation resume
@@ -92,3 +104,37 @@ export type InvitationErrorCode =
 export type InvitationServiceResult<TData> =
   | { success: true; data: TData }
   | { success: false; error: { code: InvitationErrorCode; message: string } };
+
+/**
+ * Safe post-submission handoff target after successful ADMIN activation
+ * (PROMPT-06): the service intentionally discards the auto-created
+ * session, so the activated ADMIN signs in with the password they just
+ * chose and lands directly in the existing onboarding wizard. The
+ * sign-in form only honors safe internal redirect paths.
+ */
+export const ACTIVATION_SIGNIN_HANDOFF = "/sign-in?redirect=/onboarding";
+
+/**
+ * Terminal UI states for the activation screen. Each maps to one safe
+ * Arabic panel; none exposes internals (token state is only
+ * distinguishable because the caller presented the token itself).
+ */
+export type ActivationNoticeState =
+  | "INVALID_TOKEN"
+  | "EXPIRED"
+  | "REVOKED"
+  | "ALREADY_ACTIVATED"
+  | "ROLE_NOT_ALLOWED"
+  | "CONFLICT"
+  | "FAILED";
+
+/**
+ * Result of the activation server action. `VALIDATION_ERROR` keeps the
+ * form on screen with an inline message; `NOTICE` replaces it with a
+ * terminal panel; `SUCCESS` shows the sign-in handoff. Never carries
+ * the raw token, the hash, or the password.
+ */
+export type ActivationActionResult =
+  | { status: "SUCCESS"; email: string }
+  | { status: "VALIDATION_ERROR"; message: string }
+  | { status: "NOTICE"; state: ActivationNoticeState; message: string };

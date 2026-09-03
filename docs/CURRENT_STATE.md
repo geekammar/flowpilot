@@ -2,8 +2,8 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-05A (GitHub Release Publication
-> Recovery).
+> Last updated: 2026-09-03 — PROMPT-06 (ADMIN Activation → Onboarding
+> Integration).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -51,8 +51,23 @@ Authentication & Authorization Model`.
   password resets, no silent role changes; cross-Business/STAFF
   conflicts typed), one-time activation via the atomic `activatedAt`
   guard (concurrent attempts cannot both succeed), interrupted
-  activations resumable, and safe results only. No UI yet. **Platform
+  activations resumable, and safe results only. **Platform
   Operator: 🟡 architecture documented, implementation pending.**
+- **ADMIN activation → onboarding integration: ✅ implemented**
+  (PROMPT-06): public activation route `/invite/[token]` with a
+  read-only invitation pre-screen (no GET-time mutation), an
+  Arabic/RTL activation form (name + password), one server action
+  composing the existing accept + activate services (Zod-stripped
+  input; invitation stays the sole authority for
+  businessId/email/role), typed Arabic error states (invalid/expired/
+  revoked/already-activated/conflict/failure), and a safe sign-in →
+  onboarding handoff after success (DECISIONS #25 — the service
+  discards the auto-created session, so the ADMIN signs in with the
+  password just chosen and lands in the existing wizard). Onboarding
+  is ADMIN-only (`requireRole("ADMIN")`); public-path policy lives in
+  `@/lib/public-paths`. Still pending on this path: invitation
+  creation/delivery UX (Team management) and the STAFF activation
+  workflow.
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Ops:** bootstrap + dev scripts (Win/Linux/macOS/Termux), doctor/verify/
@@ -80,14 +95,14 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
 - **Release:** v0.1.0 published on GitHub (2026-08-27). v0.2.0 —
   Invitation Creation Foundation, v0.3.0 — Invitation Acceptance
   Foundation, and v0.4.0 — ADMIN Account Activation Foundation:
-  published on GitHub (2026-09-03, PROMPT-05A) — every tag is pushed
-  to origin and has a GitHub Release; v0.4.0 is the current Latest.
-  Local `main` and origin `main` are in sync (see
+  published on GitHub (2026-09-03, PROMPT-05A). v0.5.0 — ADMIN
+  Activation → Onboarding Integration: published 2026-09-03 (PROMPT-06,
+  via the documented GitHub publication workflow) — every tag is
+  pushed to origin and has a GitHub Release; v0.5.0 is the current
+  Latest. Local `main` and origin `main` are in sync (see
   `PROJECT_STATUS.md → Release Status`). Open user action: the repo is
   public but must be private (GITHUB_WORKFLOW.md / DECISIONS #18).
-- **Next step (product):** PROMPT-06 — ADMIN Activation → Onboarding
-  Integration (connect the activated ADMIN into the existing
-  onboarding wizard; compose accept + activate at the route layer
-  when the activation UI lands)
-  — then customers → staff → services → settings → team (`BUILD_STATE.md`).
+- **Next step (product):** PROMPT-07 — Customers Directory (Spec A
+  §11: searchable directory, notes, customer history) — then staff
+  area → services → settings → team (`BUILD_STATE.md`).
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

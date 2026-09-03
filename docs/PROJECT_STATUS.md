@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-05A —
-> GitHub Release Publication Recovery).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-06 —
+> ADMIN Activation → Onboarding Integration).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -28,15 +28,15 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Invitation creation foundation (service layer)           | ✅ complete (PROMPT-03)                |
 | Invitation acceptance foundation (service layer)         | ✅ complete (PROMPT-04)                |
 | ADMIN account activation (Better Auth + membership)      | ✅ complete (PROMPT-05, service layer) |
-| Activation → onboarding integration                      | ⏳ not started (next — PROMPT-06)      |
-| Customers directory                                      | ⏳ placeholder                         |
+| Activation → onboarding integration                      | ✅ complete (PROMPT-06)                |
+| Customers directory                                      | ⏳ placeholder (next — PROMPT-07)      |
 | Services management                                      | ⏳ placeholder                         |
 | Business settings / knowledge screens                    | ⏳ placeholder                         |
 | Team management (admin)                                  | ⏳ placeholder                         |
 | Staff area                                               | ⏳ placeholder                         |
 
-Auth note (Prompts 09–10 + PROMPT-03/04/05): account creation for the
-pilot stage is invitation-first — the Platform Operator provisions
+Auth note (Prompts 09–10 + PROMPT-03/04/05/06): account creation for
+the pilot stage is invitation-first — the Platform Operator provisions
 the Business and invites the initial ADMIN; public self-sign-up is NOT
 the primary pilot flow (future self-serve mode remains architecturally
 possible). The `/sign-up` placeholder page remains in code but is no
@@ -46,11 +46,14 @@ token generation with hash-only persistence, 7-day expiry,
 duplicate-open prevention, business-scoped create/list/revoke service
 operations), the acceptance foundation (one-time, atomic, token-based
 acceptance with lifecycle enforcement and a safe invitation-context
-result), AND the ADMIN account activation foundation (Better Auth
+result), the ADMIN account activation foundation (Better Auth
 identity creation, one identity per email, one-time atomic
-`activatedAt` + Business ADMIN membership) are implemented at the
-service layer; token delivery and all invitation/activation UI are
-not yet implemented.
+`activatedAt` + Business ADMIN membership), AND the activation →
+onboarding integration (public `/invite/[token]` activation route
+composing accept + activate, safe sign-in → onboarding handoff,
+ADMIN-only onboarding guard) are implemented. Not yet implemented:
+token delivery, invitation creation UI (Team management), and the
+STAFF activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -130,11 +133,23 @@ on-device (→ migrate from desktop/CI).
   (`ef012f0`); the tag is pushed to origin and the GitHub Release
   "FlowPilot v0.3.0 — Invitation Acceptance Foundation" exists.
 - **v0.4.0 — ADMIN Account Activation Foundation: PUBLISHED**
-  (2026-09-03, PROMPT-05A — current Latest release). Annotated tag
-  `v0.4.0` points at the PROMPT-05 commit (`896188a`, `feat(auth): add
-ADMIN account activation`); the tag is pushed to origin and the
-  GitHub Release "FlowPilot v0.4.0 — ADMIN Account Activation
-  Foundation" exists.
+  (2026-09-03, PROMPT-05A). Annotated tag `v0.4.0` points at the
+  PROMPT-05 commit (`896188a`, `feat(auth): add ADMIN account
+activation`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.4.0 — ADMIN Account Activation Foundation" exists.
+- **v0.5.0 — ADMIN Activation → Onboarding Integration: PUBLISHED**
+  (2026-09-03, PROMPT-06 — current Latest release). Annotated tag
+  `v0.5.0` points at the PROMPT-06 commit
+  (`feat(auth): connect admin activation to onboarding`); the tag is
+  pushed to origin and the GitHub Release "FlowPilot v0.5.0 — ADMIN
+  Activation → Onboarding Integration" exists. Published through the
+  documented GitHub publication workflow (PROMPT-05A pattern: git
+  state → origin identity → gh auth → local/remote commits →
+  local/remote tags → existing releases → push →
+  `gh release create --verify-tag`); the legacy `pnpm release`
+  doctor gate still blocks on this device's placeholder
+  `DATABASE_URL` (device-local, user action) and was not used, per
+  the operator's instruction for operations-only publication.
 - Publication history was reconciled by PROMPT-05A (operations-only):
   local `main` was already current on origin (no commit push needed);
   the three missing tags were pushed normally (no force) and the
@@ -150,10 +165,10 @@ ADMIN account activation`); the tag is pushed to origin and the
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: activation → onboarding
-integration (PROMPT-06, next) → invitation/activation UI → customers
-→ staff area → services → settings → team). Spec A exit criteria live
-in `ROADMAP.md`.
+**Finish Spec A first** (recommended order: customers directory
+(PROMPT-07, next) → staff area → services → settings → team, which
+includes the STAFF invitation/activation UX and composes the existing
+invitation services). Spec A exit criteria live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

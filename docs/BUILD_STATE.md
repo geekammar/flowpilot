@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-05B (Context Compression & Documentation Index).
+> Last updated: PROMPT-06 (ADMIN Activation → Onboarding Integration).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1666,6 +1666,188 @@ it in documentation/ops prompts.
 
 ---
 
+## PROMPT-06 — ADMIN Activation → Onboarding Integration
+
+**Status:** ✅ Complete
+
+> Activation UI + route-level composition + onboarding connection only.
+> Reuses the existing invitation services (PROMPT-03/04/05) — no second
+> activation implementation, no onboarding redesign, no new onboarding
+> steps, no schema/Better Auth changes, no new dependencies.
+
+### ALREADY IMPLEMENTED (reused, untouched in spirit)
+
+- Invitation data model (Prompt 10) + creation foundation (PROMPT-03) +
+  acceptance foundation (PROMPT-04) + ADMIN account activation
+  foundation (PROMPT-05) — all service operations, token security
+  utilities, and typed Arabic error conventions
+- Existing onboarding wizard (`src/app/(onboarding)/**` + feature
+  module) — NOT redesigned, NOT extended
+- Better Auth integration (`src/lib/auth.ts`) — untouched
+- Session guards (`src/server/auth/guards.ts`) — reused (`requireRole`)
+- Sign-in redirect handling (`?redirect=` with safe-internal-path check
+  in the login form) — reused for the handoff
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **Public activation route** `src/app/(auth)/invite/[token]/page.tsx`
+  (+ `loading.tsx` skeleton): Arabic-first, RTL, mobile-first, centered
+  auth card, `noindex` (the token is a credential in the path). The
+  page performs a READ-ONLY pre-screen via the new
+  `getInvitationByToken` service operation (hash-only lookup, derived
+  lifecycle status, inviting-business display name — NO mutation on
+  GET) and renders: the activation form (PENDING or
+  accepted-but-unactivated — the resume path), or a terminal notice
+  (invalid/unknown token, expired, revoked, already-activated with
+  sign-in CTA, STAFF-invitation not supported, transient failure).
+- **Read-only invitation lookup** `getInvitationByToken` added to the
+  EXISTING invitation service (reuses `acceptInvitationInputSchema`,
+  `findByTokenHash`, `deriveInvitationStatus`, `businesses.findById`;
+  injectable deps unchanged; result excludes token/hash; unknown or
+  malformed tokens get one generic not-found error).
+- **Route-level activation composition**
+  `completeAdminActivation` (`src/features/invitations/server/
+admin-activation-flow.ts`, injectable deps): validates with the
+  EXISTING `activateAdminAccountInputSchema` → calls the EXISTING
+  `acceptInvitation` (tolerating `INVITATION_ALREADY_ACCEPTED` as the
+  resume path) → calls the EXISTING `activateAdminAccount` → maps
+  typed service errors to safe Arabic UI states. Client input accepts
+  ONLY `{token, name, password}`; Zod strips everything else and the
+  persisted invitation stays the sole authority for
+  businessId/email/role.
+- **Server action** `activateInvitedAdminAction`
+  (`src/features/invitations/actions/activation-actions.ts`): thin
+  `"use server"` wrapper — no lifecycle logic at the route layer.
+- **Activation UI components** (invitations feature):
+  `activation-form.tsx` (client; hidden token field — the token never
+  appears in the visible UI; name + password with visibility toggle;
+  inline validation errors; submitting state; success panel; terminal
+  notices post-submit) and `activation-notice.tsx` (server+client
+  panel per state, design-system tokens, a11y roles/labels).
+- **Success → onboarding handoff (DECISIONS #25)**: the activation
+  service intentionally discards the auto-created session, so success
+  renders a panel linking to `ACTIVATION_SIGNIN_HANDOFF` =
+  `/sign-in?redirect=/onboarding`; the activated ADMIN signs in with
+  the password they just chose and lands in the EXISTING onboarding
+  wizard. No direct session handoff was invented (no session token in
+  action payloads, no client-set cookies).
+- **Public-path policy extraction** `src/lib/public-paths.ts`
+  (`isPublicPath`): moved out of `src/proxy.ts`, which now imports it.
+  `/invite/` is public (token-scoped route); `/onboarding` and all app
+  routes remain protected (proxy cookie gate, tier 1).
+- **Onboarding ADMIN guard**: the `(onboarding)` layout now uses the
+  EXISTING `requireRole("ADMIN")` instead of `requireUser` — an
+  authenticated STAFF user can no longer open the ADMIN onboarding
+  wizard (redirects to `/access-denied`); unauthenticated access was
+  and stays blocked by the two-tier model.
+
+### NOT IMPLEMENTED (later prompts — unchanged)
+
+- STAFF activation workflow / staff invitation UX (Team management)
+- Token delivery (email/WhatsApp link) — the caller of creation still
+  receives the raw token exactly once
+- Founder/Platform UI (Spec B), invitation management UI for admins,
+  public self-sign-up (not the pilot model)
+
+The next step is:
+
+PROMPT-07 — Customers Directory (Spec A §11). Do NOT implement it now.
+
+### Generated Files
+
+`src/lib/public-paths.ts`, `src/features/invitations/server/
+admin-activation-flow.ts`, `src/features/invitations/actions/
+activation-actions.ts`, `src/features/invitations/components/
+{activation-form,activation-notice}.tsx`, `src/app/(auth)/invite/
+[token]/{page,loading}.tsx`; updated `src/proxy.ts` (uses the shared
+public-path helper), `src/app/(onboarding)/layout.tsx` (ADMIN guard),
+`src/features/invitations/server/invitation-service.ts`
+(`getInvitationByToken`), `src/features/invitations/types.ts`
+(`GetInvitationByTokenSuccess`, `ACTIVATION_SIGNIN_HANDOFF`,
+`ActivationNoticeState`, `ActivationActionResult`),
+`src/features/invitations/README.md`; updated `docs/DECISIONS.md`
+(#25), `docs/SPEC_A.md`, `docs/ARCHITECTURE.md`,
+`docs/CURRENT_STATE.md`, `docs/PROJECT_STATUS.md`, this file.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run —
+  PROMPT-03/04/05 pattern): **58/58 checks passed** offline with
+  in-memory repository/identity stand-ins running the REAL service +
+  composition code. Coverage of the required categories: valid path →
+  SUCCESS with safe result shape + one identity + membership attached
+  with the invitation's businessId/ADMIN/active; handoff target is the
+  safe sign-in→onboarding redirect; unknown and wrong-but-well-formed
+  tokens → INVALID_TOKEN with zero writes; expired → EXPIRED with zero
+  writes; revoked → REVOKED with zero writes; already-activated →
+  ALREADY_ACTIVATED with no second identity and no password-reset
+  attempt; hostile payload carrying `businessId`/`role`/`email`/
+  `acceptedAt`/`activatedAt` overrides still activates with the
+  INVITATION's authority (identity email, membership business + ADMIN
+  role; activate step received only token/name/password);
+  `/onboarding` + all steps + app routes NOT public while
+  `/invite/<token>`, `/sign-in`, `/api/health`, `/api/auth/*` are;
+  STAFF invitation rejected with ROLE_NOT_ALLOWED and the
+  `(onboarding)` layout is guarded by `requireRole("ADMIN")`
+  (source-level); raw token and hash never appear in any flow/read
+  result, stored records contain only the hash, and no new/changed
+  module uses console/logging; duplicate prevention (sequential +
+  concurrent re-submission → ALREADY_ACTIVATED, exactly one identity);
+  page pre-screen states (PENDING/ACCEPTED/ACTIVATED/REVOKED/EXPIRED,
+  unknown, malformed charset, persistence failure → honest FAILED,
+  STAFF role exposure, soft-deleted business → null name) and the
+  read's NO-mutation-on-GET property; edge cases (interrupted
+  activation resume, cross-business conflict without moving the user,
+  same-business STAFF not promoted, validation errors never reaching
+  the services, identity-creation failure leaves no membership write,
+  USER_ALREADY_EXISTS race resume, acceptance-of-ACTIVATED
+  regression).
+- `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅
+- `pnpm exec next build --webpack` ✅ (required locally on
+  Android/Termux; `/invite/[token]` compiled as a dynamic route)
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated): the
+  real-database behavior of the full page/action path (render with a
+  live Neon DB, a real `auth.api.signUpEmail` call, and the proxy
+  redirect against a running server) — this device has a placeholder
+  `DATABASE_URL` and cannot run the Prisma schema engine; migrations
+  `20260902120000` and `20260903120000` remain unapplied on-device
+  (apply from desktop/CI: `pnpm db:deploy`). The in-memory harness
+  verifies the full workflow logic around the repository primitives.
+
+### Known Limitations
+
+- The activated ADMIN must sign in manually after activation (safe
+  handoff by design — DECISIONS #25); there is no auto-login.
+- If a never-assigned Better Auth identity already exists for the
+  invited email (interrupted activation or legacy account), the
+  activation form's password field is effectively ignored — the
+  service attaches the existing identity without resetting its
+  password (PROMPT-05 semantics). The screen communicates the
+  invited email; the edge case is rare and self-heals through the
+  typed conflict/resume results.
+- Token delivery remains manual: the operator must send
+  `https://<app-url>/invite/<rawToken>` to the invitee (raw token is
+  returned exactly once from `createInvitation`).
+- No page-level `loading.tsx` for other `(auth)` routes (pre-existing;
+  only the new invite route gained one).
+
+### Release
+
+- Commit `feat(auth): connect admin activation to onboarding`
+  (implementation + docs; `package.json` version bumped to 0.5.0 per
+  the documented convention that `/api/health` reports the version).
+- Annotated tag `v0.5.0` — ADMIN Activation → Onboarding Integration —
+  points at the PROMPT-06 commit. Published through the documented
+  GitHub publication workflow (PROMPT-05A pattern: git state → origin
+  identity → gh auth → local/remote commits → local/remote tags →
+  existing releases → push → `gh release create --verify-tag`); the
+  legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's prompt instruction.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -1675,9 +1857,10 @@ it in documentation/ops prompts.
   settings/knowledge screens, Team management (admin), and the Staff area.
   (The `/sign-up` placeholder page remains in code but is no longer a
   planned deliverable — superseded by the invitation-first model; the
-  invitation foundation, acceptance, and ADMIN account activation now
-  exist in the service layer, but all invitation/activation UI is still
-  to be built.)
+  invitation foundation, acceptance, ADMIN account activation, and the
+  ADMIN activation UI → onboarding handoff now exist, but invitation
+  creation UI / team management and token delivery are still to be
+  built.)
 - **Ops 01 (DX pass) complete:** cross-platform bootstrap/dev scripts,
   `pnpm run setup` / `pnpm run doctor` / `pnpm verify`, safe `.env.local`
   automation, unified env precedence, per-OS setup docs — see
@@ -1748,7 +1931,20 @@ it in documentation/ops prompts.
   domain layer (invitation mark + membership attach in one
   transaction; full rollback on conflict). Better Auth owns
   credentials (signUpEmail + adapter transaction option); FlowPilot
-  owns the invitation lifecycle and Business membership. No UI.
+  owns the invitation lifecycle and Business membership.
+- **ADMIN activation → onboarding integration (PROMPT-06) complete:**
+  public activation route `/invite/[token]` (read-only pre-screen via
+  `getInvitationByToken`, no GET-time mutation), Arabic/RTL activation
+  form + terminal notices, one server action composing the existing
+  accept + activate services with Zod-stripped `{token, name,
+password}` input and typed Arabic error mapping, safe sign-in →
+  onboarding handoff after success (DECISIONS #25 — no invented
+  session shortcut), public-path policy extracted to
+  `@/lib/public-paths`, and the `(onboarding)` layout guarded with
+  `requireRole("ADMIN")` (STAFF blocked). No onboarding redesign, no
+  schema/auth changes. Still missing on this path: invitation
+  creation/delivery UX (Team management prompt) and the STAFF
+  activation workflow.
 - **Release publication recovery (PROMPT-05A, ops-only) complete:**
   tags v0.2.0 / v0.3.0 / v0.4.0 pushed to origin and their GitHub
   Releases created (2026-09-03) — all four versions are now published
@@ -1761,10 +1957,8 @@ it in documentation/ops prompts.
   `docs/DOCS_INDEX.md`, Tier 3 historical preserved. No product code or
   canonical documentation content changed; stale status claims in
   PRODUCT_GLOSSARY / PROJECT_README corrected.
-- **Next Step:** PROMPT-06 — ADMIN Activation → Onboarding Integration
-  (connect the activated ADMIN into the existing onboarding wizard;
-  compose accept + activate at the route layer when the activation UI
-  lands). Do NOT combine with the Team management UI — that lands
-  afterwards and composes the existing services. Then customers →
-  staff → services → settings → team.
+- **Next Step:** PROMPT-07 — Customers Directory (Spec A §11:
+  searchable directory, notes, customer history via conversations +
+  appointments). Do NOT combine with Team management or the STAFF
+  activation workflow. Then staff area → services → settings → team.
 - After each prompt: update this file and `DECISIONS.md`.
