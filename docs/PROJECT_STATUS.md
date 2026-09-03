@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-02 (after PROMPT-03 —
-> Invitation Creation Foundation).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-04 —
+> Invitation Acceptance Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -26,24 +26,27 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Auth architecture alignment (docs)                       | ✅ complete (Prompt 09, DECISIONS #22) |
 | Invitation data model (schema/migration/repo/validation) | ✅ complete (Prompt 10)                |
 | Invitation creation foundation (service layer)           | ✅ complete (PROMPT-03)                |
-| Invitation acceptance / account activation               | ⏳ not started (next)                  |
+| Invitation acceptance foundation (service layer)         | ✅ complete (PROMPT-04)                |
+| Account activation (password setup, Better Auth)         | ⏳ not started (next — PROMPT-05)      |
 | Customers directory                                      | ⏳ placeholder                         |
 | Services management                                      | ⏳ placeholder                         |
 | Business settings / knowledge screens                    | ⏳ placeholder                         |
 | Team management (admin)                                  | ⏳ placeholder                         |
 | Staff area                                               | ⏳ placeholder                         |
 
-Auth note (Prompts 09–10 + PROMPT-03): account creation for the pilot
-stage is invitation-first — the Platform Operator provisions the Business
-and invites the initial ADMIN; public self-sign-up is NOT the primary
-pilot flow (future self-serve mode remains architecturally possible).
-The `/sign-up` placeholder page remains in code but is no longer a
-planned deliverable. The Invitation DATA foundation (model, migration,
-repository, validation) AND the creation foundation (secure token
-generation with hash-only persistence, 7-day expiry, duplicate-open
-prevention, business-scoped create/list/revoke service operations) are
-implemented; acceptance, activation, token delivery, and all invitation
-UI are not yet implemented.
+Auth note (Prompts 09–10 + PROMPT-03/04): account creation for the
+pilot stage is invitation-first — the Platform Operator provisions the
+Business and invites the initial ADMIN; public self-sign-up is NOT the
+primary pilot flow (future self-serve mode remains architecturally
+possible). The `/sign-up` placeholder page remains in code but is no
+longer a planned deliverable. The Invitation DATA foundation (model,
+migration, repository, validation), the creation foundation (secure
+token generation with hash-only persistence, 7-day expiry,
+duplicate-open prevention, business-scoped create/list/revoke service
+operations), AND the acceptance foundation (one-time, atomic,
+token-based acceptance with lifecycle enforcement and a safe
+invitation-context result) are implemented; account activation, token
+delivery, and all invitation UI are not yet implemented.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -120,20 +123,24 @@ on-device (→ migrate from desktop/CI).
   commits) is pushed. Publishing the tag + GitHub Release is blocked by
   the documented release gate `pnpm run doctor` (this device has a
   placeholder `DATABASE_URL` — a user action, not a code defect).
+- **v0.3.0 — Invitation Acceptance Foundation: TAGGED LOCALLY, NOT YET
+  PUBLISHED.** Annotated tag `v0.3.0` points at the PROMPT-04 commit;
+  `main` is pushed. Same gate as v0.2.0 (placeholder `DATABASE_URL`).
 - To publish after setting a real `DATABASE_URL` in `.env.local`:
 
   ```bash
   bash scripts/release.sh flowpilot v0.2.0 <notes-file>
+  bash scripts/release.sh flowpilot v0.3.0 <notes-file>
   ```
 
-  (release notes with the required sections were prepared during
-  PROMPT-03; the script skips the existing local tag and completes the
-  push + GitHub Release once the gates pass).
+  (release notes with the required sections are prepared per feature;
+  the script skips existing local tags and completes the push + GitHub
+  Release once the gates pass).
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: invitation acceptance /
-activation (next) → customers → staff area → services → settings →
+**Finish Spec A first** (recommended order: account activation
+(PROMPT-05, next) → customers → staff area → services → settings →
 team). Spec A exit criteria live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,

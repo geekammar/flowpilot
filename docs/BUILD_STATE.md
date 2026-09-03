@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-03 (Invitation Creation Foundation).
+> Last updated: PROMPT-04 (Invitation Acceptance Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1106,6 +1106,154 @@ updated `src/server/repositories/invitation.repository.ts`,
 
 ---
 
+## PROMPT-04 — Invitation Acceptance Foundation
+
+**Status:** ✅ Complete
+
+> Server/domain foundation only: one-time, atomic, token-based
+> invitation acceptance. Raw token → hash → locate → lifecycle
+> validation → atomic PENDING→ACCEPTED transition → safe invitation
+> context. No account activation, no Better Auth changes, no password,
+> no session, no User creation, no delivery, no UI.
+
+### Implemented / Already Implemented / Not Implemented
+
+**IMPLEMENTED (this prompt):**
+
+- Invitation acceptance (`acceptInvitation` service operation +
+  `acceptPendingInvitation` repository primitive + acceptance input
+  validation)
+
+**ALREADY IMPLEMENTED (reused, untouched):**
+
+- Invitation data model (Prompt 10) — schema, migration, indexes
+- Invitation creation foundation (PROMPT-03) — token generation,
+  hash-only persistence, centralized 7-day expiry, duplicate-open
+  prevention, create/list/revoke service operations
+- `findByTokenHash` repository lookup (Prompt 10, built for this)
+- Token hashing utility (`hashInvitationToken`), derived lifecycle
+  helper (`deriveInvitationStatus`), Arabic typed-error conventions
+
+**NOT IMPLEMENTED (later prompts):**
+
+- Account activation (PROMPT-05 — ADMIN Account Activation Foundation)
+- Better Auth integration for the invitation flow / password creation
+- Invitation delivery (email/WhatsApp link)
+- Acceptance UI (`/invite/[token]` etc.)
+- ADMIN onboarding reconnection, STAFF workflow, Founder UI
+
+### Completed Work
+
+- `InvitationRepository.acceptPendingInvitation(tokenHash)` — the
+  minimal atomic primitive: a single conditional `updateMany` (pending
+  - unrevoked + unexpired) inside a transaction, then a re-read of the
+    accepted row. Zero rows updated (concurrent acceptance, revocation,
+    or expiry between the workflow's pre-check and the update) returns
+    null — the guard lives in the UPDATE's WHERE clause itself, so two
+    concurrent acceptances cannot both succeed. Expiry is enforced here
+    as the database-level last line of defense (the service enforces it
+    as the workflow layer, per DECISIONS #23's centralized policy).
+- `acceptInvitation(rawToken input)` service operation:
+  validate (Zod) → hash with the EXISTING `hashInvitationToken`
+  utility → `findByTokenHash` → lifecycle evaluation via the EXISTING
+  `deriveInvitationStatus` → atomic conditional acceptance →
+  race-safe failure classification → safe result.
+- One-time acceptance: a second attempt (sequential or concurrent)
+  fails with `INVITATION_ALREADY_ACCEPTED`; the lifecycle stays
+  PENDING → ACCEPTED, never ACCEPTED → ACCEPTED.
+- Lifecycle failures map to the existing typed-result conventions
+  with new additive codes: `INVITATION_ALREADY_ACCEPTED`,
+  `INVITATION_REVOKED`, `INVITATION_EXPIRED` (safe to distinguish
+  because the caller presented a valid token); unknown/invalid tokens
+  get one generic `INVITATION_NOT_FOUND` whose message does not help
+  differentiate token states. No new error framework.
+- Token-scoped by design (the caller is not yet authenticated):
+  tokenHash is the lookup boundary; the persisted invitation is the
+  sole authority for email/businessId/role — the acceptance input
+  accepts ONLY the raw token (Zod strips everything else), so callers
+  cannot override businessId/email/role/expiration.
+- Result excludes the raw token and the tokenHash (safe
+  `InvitationView` context for PROMPT-05: id, email, businessId, role,
+  acceptedAt); neither value is ever logged (source-scanned).
+- Acceptance input schema: token trimmed, non-empty, ≤256 chars,
+  base64url charset (the generated format), Arabic messages —
+  malformed/oversized input is rejected as `INVALID_INPUT` before any
+  hash lookup.
+- PostgreSQL/Prisma transaction capabilities only — no distributed
+  lock, no Redis, no queues, no new infrastructure; repositories
+  remain the only Prisma consumers.
+
+### Generated Files
+
+`src/features/invitations/server/invitation-service.ts` (acceptance
+operation + extended deps), `src/features/invitations/
+schemas/invitation-schema.ts` (acceptance input),
+`src/features/invitations/types.ts` (new codes +
+`AcceptInvitationSuccess`), `src/server/repositories/
+invitation.repository.ts` (`acceptPendingInvitation`), `src/features/
+invitations/README.md`; updated `docs/BUILD_STATE.md`,
+`docs/DATABASE.md`, `docs/CURRENT_STATE.md`,
+`docs/PROJECT_STATUS.md`.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03 pattern): **22/22 checks passed** offline with in-memory
+  repository stand-ins modeling the atomic conditional-update
+  semantics — valid pending accepted; acceptedAt set exactly once;
+  raw token never returned; tokenHash never in result/view; hash-only
+  lookups (64-hex, never the raw token); expired/revoked/already-
+  accepted rejected with typed codes and zero writes; unknown token →
+  generic not-found with no token material in the message; empty/
+  whitespace/malformed/oversized → INVALID_INPUT without repository
+  access; 256-char boundary passes validation but is not found;
+  second sequential and concurrent (Promise.all) acceptance attempts
+  fail as already-accepted with exactly one write; business
+  association preserved; businessId/email/role not overridable.
+- `pnpm db:generate` ✅ · `pnpm typecheck` ✅ · `pnpm lint` ✅
+- `pnpm verify` (full gate: lint/typecheck/format/build --webpack) ✅
+- `pnpm security` ✅
+- Source-level security audit ✅: no `console`/logger usage in any
+  changed module; raw token never persisted (hash is the only stored
+  credential representation); no token values in error messages; no
+  SQL/database internals leaked.
+- NOT verified on-device (environment limits, honestly stated): the
+  real-database atomicity of `acceptPendingInvitation` (two truly
+  concurrent Prisma transactions against PostgreSQL) and actual
+  persistence — this device has a placeholder `DATABASE_URL` and
+  cannot run the Prisma schema engine; migration `20260902120000`
+  remains unapplied on-device (apply from desktop/CI:
+  `pnpm db:deploy`). The single-statement conditional UPDATE is the
+  standard Postgres-safe pattern, and the in-memory harness verifies
+  the workflow logic around it.
+
+### Known Limitations
+
+- No HTTP route / server action / UI yet — the future acceptance
+  prompt wraps `acceptInvitation` at the route layer (PROMPT-05
+  composes it for account activation).
+- Acceptance marks the invitation only; it does NOT create a User,
+  Better Auth account, password, or session (DECISIONS #22 flow).
+- Raw-token delivery remains out of scope; the caller of creation
+  received the raw token exactly once.
+- The acceptance concurrency guarantee relies on the repository's
+  conditional UPDATE (plus the unique `token_hash` lookup); like all
+  application-level guards on this stack, a real-DB integration test
+  should accompany the first deployment against Neon.
+
+### Release
+
+- Atomic commit `feat(invitations): add invitation acceptance
+foundation` (implementation + docs only; schema untouched).
+- Annotated tag `v0.3.0` — Invitation Acceptance Foundation points at
+  the PROMPT-04 commit; `main` is pushed to origin. Tag push + GitHub
+  Release remain blocked by the documented release gate
+  (`pnpm run doctor` → NOT READY: placeholder `DATABASE_URL` on this
+  device — user action), same as v0.2.0. Publish afterwards with
+  `bash scripts/release.sh flowpilot v0.3.0 <notes-file>`.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -1168,11 +1316,20 @@ updated `src/server/repositories/invitation.repository.ts`,
   generation + hash-only persistence, centralized 7-day expiry,
   duplicate-open-invitation prevention (transactional), business-scoped
   list/revoke service operations with typed results, and the minimal
-  per-feature release-tooling extension. No UI, no acceptance, no
-  activation, no delivery.
-- **Next Step:** Invitation acceptance + account activation (accept a
-  valid pending token, expiry enforcement, set password / activate via
-  Better Auth, onboarding hand-off). Do NOT combine with the Team
-  management UI — that lands afterwards and composes the existing
-  service. Then customers → staff → services → settings → team.
+  per-feature release-tooling extension. No UI, no delivery.
+- **Invitation acceptance foundation (PROMPT-04) complete:** one-time,
+  atomic, token-based acceptance — raw token hashed with the existing
+  utility, hash-only lookup, lifecycle enforcement (expired/revoked/
+  already-accepted rejected; expiry enforced at the workflow layer),
+  single conditional-update repository primitive (concurrent
+  acceptance cannot succeed twice), typed Arabic errors with a generic
+  not-found for unknown tokens, and a safe invitation context result
+  (no raw token, no hash). No account activation, no Better Auth
+  changes, no UI.
+- **Next Step:** PROMPT-05 — ADMIN Account Activation Foundation
+  (compose `acceptInvitation`'s result to activate the invited ADMIN:
+  password setup via Better Auth, account activation; keep it small).
+  Do NOT combine with the Team management UI — that lands afterwards
+  and composes the existing services. Then customers → staff →
+  services → settings → team.
 - After each prompt: update this file and `DECISIONS.md`.

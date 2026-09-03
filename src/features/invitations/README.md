@@ -1,10 +1,12 @@
 # Feature: invitations
 
 Invitation workflow foundation (DECISIONS #22): secure creation (token
-generation + hash-only persistence), business-scoped listing, and
-revocation. Acceptance, account activation, and delivery are later
-prompts. No UI here yet — the future Team management screen composes
-this feature at the route layer.
+generation + hash-only persistence), business-scoped listing,
+revocation, and one-time token-based acceptance. Account activation,
+password setup, and delivery are later prompts. No UI here yet — the
+future Team management screen composes the creation side of this
+feature at the route layer, and the future acceptance/activation flow
+composes `acceptInvitation`.
 
 ## Isolation rules
 
@@ -22,3 +24,7 @@ this feature at the route layer.
 - Raw invitation tokens are credentials: returned from creation exactly
   once, never persisted, never logged (see `@/server/security/invitation-token`).
 - Only the SHA-256 `tokenHash` is persisted; lookups are hash-only.
+- Acceptance is one-time and atomic: a token can produce exactly one
+  successful acceptance; every later or concurrent attempt fails with
+  a typed invalid-state error.
+- Acceptance results exclude both the raw token and the token hash.

@@ -34,6 +34,23 @@ export const revokeInvitationInputSchema = z.object({
   invitationId: uuidSchema,
 });
 
+/**
+ * Acceptance input: the RAW invitation token only. The caller is not
+ * authenticated yet, so the token itself is the credential — no other
+ * field (businessId/email/role) may be supplied or override anything.
+ * Base64url is the token format the security utility generates; length
+ * headroom stays generous (the generated form is 43 chars).
+ */
+export const acceptInvitationInputSchema = z.object({
+  token: z
+    .string()
+    .trim()
+    .min(1, "رمز الدعوة مطلوب")
+    .max(256, "رمز الدعوة طويل جداً")
+    .regex(/^[A-Za-z0-9_-]+$/, "رمز الدعوة غير صالح"),
+});
+
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 export type ListInvitationsInput = z.infer<typeof listInvitationsInputSchema>;
 export type RevokeInvitationInput = z.infer<typeof revokeInvitationInputSchema>;
+export type AcceptInvitationInput = z.infer<typeof acceptInvitationInputSchema>;

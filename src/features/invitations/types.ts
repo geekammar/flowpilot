@@ -46,11 +46,23 @@ export type RevokeInvitationSuccess = {
   invitation: InvitationView;
 };
 
+/**
+ * Acceptance returns only the safe persisted context the activation
+ * step needs (email, businessId, role, acceptedAt). Never the raw
+ * token, never the hash.
+ */
+export type AcceptInvitationSuccess = {
+  invitation: InvitationView;
+};
+
 export type InvitationErrorCode =
   | "INVALID_INPUT"
   | "BUSINESS_NOT_FOUND"
   | "INVITATION_ALREADY_OPEN"
   | "INVITATION_NOT_FOUND"
+  | "INVITATION_ALREADY_ACCEPTED"
+  | "INVITATION_REVOKED"
+  | "INVITATION_EXPIRED"
   | "INVALID_INVITATION_STATE"
   | "PERSISTENCE_FAILED";
 

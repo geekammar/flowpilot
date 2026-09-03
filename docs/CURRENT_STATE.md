@@ -2,7 +2,7 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-02 — PROMPT-03 (Invitation Creation Foundation).
+> Last updated: 2026-09-03 — PROMPT-04 (Invitation Acceptance Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -31,10 +31,17 @@ Authentication & Authorization Model`.
   (Business + normalized email; expired/revoked/accepted never block),
   and business-scoped `createInvitation` / `listInvitations` /
   `revokeInvitation` service operations with typed results — no UI, no
-  acceptance, no activation, no delivery yet. **Invitation acceptance:
-  🟡 not implemented yet.** **Account activation: 🟡 not implemented
-  yet.** **Platform Operator: 🟡 architecture documented, implementation
-  pending.**
+  delivery yet.
+- **Invitation acceptance foundation: ✅ implemented** (PROMPT-04):
+  one-time, atomic, token-based acceptance — raw token hashed with the
+  existing utility, hash-only lookup, lifecycle enforcement
+  (expired/revoked/already-accepted rejected with typed Arabic errors;
+  unknown tokens get one generic not-found), a single conditional-update
+  repository primitive (concurrent acceptance cannot succeed twice),
+  and a safe invitation context result (id, email, businessId, role,
+  acceptedAt — never the raw token or hash). **Account activation:
+  🟡 not implemented yet (next: PROMPT-05).** **Platform Operator: 🟡
+  architecture documented, implementation pending.**
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Ops:** bootstrap + dev scripts (Win/Linux/macOS/Termux), doctor/verify/
@@ -61,12 +68,16 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   `pnpm db:deploy` vs Neon, push repo, import) — see `docs/DEPLOYMENT_STATUS.md`.
 - **Release:** v0.1.0 published on GitHub (2026-08-27). v0.2.0 —
   Invitation Creation Foundation: annotated tag created locally on the
-  PROMPT-03 commit and `main` is pushed; tag push + GitHub Release are
-  blocked by the doctor gate (placeholder `DATABASE_URL` on this device)
-  — after setting a real `DATABASE_URL`, run
-  `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` (see
+  PROMPT-03 commit; tag push + GitHub Release are blocked by the doctor
+  gate (placeholder `DATABASE_URL` on this device). v0.3.0 —
+  Invitation Acceptance Foundation: annotated tag on the PROMPT-04
+  commit, `main` pushed — same tag-push/release gate applies.
+  After setting a real `DATABASE_URL`, publish with
+  `bash scripts/release.sh flowpilot v0.2.0 <notes-file>` and
+  `bash scripts/release.sh flowpilot v0.3.0 <notes-file>` (see
   `PROJECT_STATUS.md → Release Status`).
-- **Next step (product):** Invitation acceptance + account activation
-  (accept a valid pending token, set password via Better Auth, activate)
+- **Next step (product):** PROMPT-05 — ADMIN Account Activation
+  Foundation (compose the accepted invitation context with Better Auth
+  password setup / account activation)
   — then customers → staff → services → settings → team (`BUILD_STATE.md`).
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

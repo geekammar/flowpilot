@@ -57,11 +57,12 @@ Hard deletes happen only via DB cascades from a parent row.
 
 > Locked conceptually in Prompt 09 (Auth & User Management Architecture
 > Alignment; `DECISIONS.md` #22). Split status: the **Invitation data
-> model is IMPLEMENTED** (Prompt 10) and the **Invitation creation
-> workflow is IMPLEMENTED** (PROMPT-03) — see the two "CURRENT
-> IMPLEMENTED" subsections below; everything else in this section is
-> **"Planned / next implementation step"** — no Prisma fields, tables,
-> enums, or migrations exist for those parts yet.
+> model is IMPLEMENTED** (Prompt 10), the **Invitation creation
+> workflow is IMPLEMENTED** (PROMPT-03), and the **Invitation
+> acceptance workflow is IMPLEMENTED** (PROMPT-04) — see the three
+> "CURRENT IMPLEMENTED" subsections below; everything else in this
+> section is **"Planned / next implementation step"** — no Prisma
+> fields, tables, enums, or migrations exist for those parts yet.
 
 ### CURRENT IMPLEMENTED — Invitation model (Prompt 10)
 
@@ -123,11 +124,46 @@ acceptance, no activation, no delivery):
   INVITATION_NOT_FOUND / INVALID_INVITATION_STATE / PERSISTENCE_FAILED;
   `tokenHash` never leaves the repository layer.
 
+### CURRENT IMPLEMENTED — Invitation acceptance workflow (PROMPT-04)
+
+One-time, atomic, token-based acceptance on top of the data model (no
+UI, no account activation, no password, no User creation, no
+delivery):
+
+- **Acceptance primitive**
+  (`InvitationRepository.acceptPendingInvitation(tokenHash)`): a
+  single conditional `updateMany` (pending + unrevoked + unexpired)
+  inside a transaction followed by a re-read of the accepted row. The
+  guard lives in the UPDATE's WHERE clause itself, so a concurrent
+  acceptance, revocation, or expiry updates zero rows and safely
+  returns null — two concurrent acceptances cannot both succeed.
+  Token-hash is the lookup boundary (unique index); no
+  client-provided `businessId` is trusted — the invitation record is
+  the sole authority for email/businessId/role.
+- **Acceptance workflow** (`acceptInvitation` service operation):
+  Zod-validated raw token (non-empty, ≤256, base64url charset) →
+  hashed with the EXISTING `hashInvitationToken` utility →
+  hash-only lookup → lifecycle evaluation via `deriveInvitationStatus`
+  (the centralized expiry policy is enforced here at the workflow
+  layer) → atomic conditional acceptance → race-safe failure
+  re-classification → safe `InvitationView` result.
+- **One-time semantics**: after acceptance the invitation is
+  terminally accepted; a second attempt (sequential or concurrent)
+  fails with `INVITATION_ALREADY_ACCEPTED` — acceptance is never
+  idempotent-successful.
+- **Result shape**: typed results with Arabic messages; codes
+  INVALID_INPUT / INVITATION_NOT_FOUND (generic for unknown or
+  invalid tokens — the message does not differentiate token states) /
+  INVITATION_ALREADY_ACCEPTED / INVITATION_REVOKED /
+  INVITATION_EXPIRED / PERSISTENCE_FAILED. The result excludes both
+  the raw token and the `tokenHash`; neither is ever logged.
+
 ### PLANNED (not yet implemented — do not assume these exist)
 
-- Invitation acceptance workflow (incl. expiry enforcement)
-- ADMIN activation / STAFF activation (password setup)
+- ADMIN activation / STAFF activation (password setup, Better Auth
+  account creation — PROMPT-05)
 - Token delivery (email / WhatsApp link to the invitee)
+- Acceptance UI (`/invite/[token]`-style route)
 - Platform Operator identity / platform-level authorization marker
 
 ### Target conceptual account model (planned)
@@ -151,8 +187,9 @@ acceptance, no activation, no delivery):
 - **Business:** `PROVISIONED → ACTIVE → DEACTIVATED` — planned (no such
   states on `businesses` yet)
 - **Invitation:** `PENDING → ACCEPTED / EXPIRED / REVOKED` — the data
-  representation is implemented (derived, above); the workflows driving
-  the transitions are planned
+  representation is implemented (derived, above); creation
+  (PROMPT-03) and acceptance (PROMPT-04) workflows are implemented;
+  token delivery is planned
 - **Business User:** `INVITED → ACTIVE → DEACTIVATED` (an ACTIVE user may
   return to ACTIVE after reactivation) — planned
 
@@ -190,12 +227,15 @@ Highlights:
   to Prisma `@db.Date`/`@db.Time` values internally.
 - `UserRepository.assignToBusiness` — links an authenticated user during
   onboarding (defaults to `ADMIN`).
-- `InvitationRepository` — data primitives + the creation guard
-  (DECISIONS #22): `create`, `createIfNoOpenInvitation` (transactional
-  duplicate-open guard, PROMPT-03), `findByTokenHash`,
+- `InvitationRepository` — data primitives + the creation guard and
+  the acceptance primitive (DECISIONS #22): `create`,
+  `createIfNoOpenInvitation` (transactional duplicate-open guard,
+  PROMPT-03), `findByTokenHash` (hash-only lookup),
   `findByIdWithinBusiness`, `listByBusiness` (tenant-scoped; no global
-  list), and guarded `revoke` / `markAccepted` (only while pending —
-  expiry validation belongs to the future acceptance workflow). No
+  list), guarded `revoke` / `markAccepted` (only while pending —
+  business-scoped state primitives), and `acceptPendingInvitation`
+  (PROMPT-04: atomic conditional PENDING→ACCEPTED transition by token
+  hash, including expiry enforcement at the database level). No
   `deletedAt` filter: the entity has no soft delete.
 
 ## Seeding

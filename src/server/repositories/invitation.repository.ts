@@ -6,8 +6,9 @@ import { db } from "@/server/db";
 
 /**
  * Invitation — FlowPilot domain concept (DECISIONS #22), separate from
- * Better Auth. Data primitives only: token generation/delivery,
- * acceptance, account activation, and password setup are later prompts.
+ * Better Auth. Data primitives only: token generation/delivery, account
+ * activation, and password setup are later prompts. Acceptance is the
+ * guarded conditional-update primitive `acceptPendingInvitation`.
  *
  * Conventions specific to this entity:
  * - Only the token HASH is stored; the raw token never reaches the DB.
@@ -110,6 +111,32 @@ export class InvitationRepository {
         where: { id },
         data: { acceptedAt: new Date() },
       });
+    });
+  }
+
+  /**
+   * Atomically transitions a token-hash-located invitation from PENDING
+   * to ACCEPTED. The conditional UPDATE itself carries the full guard
+   * (pending + unrevoked + unexpired), so a concurrent acceptance,
+   * revocation, or expiry between the workflow's pre-check and this
+   * call updates zero rows and safely returns null. The transaction
+   * then re-reads the row so the caller gets the persisted accepted
+   * record. Expiry is enforced here too because the database-level
+   * conditional update is the last line of defense.
+   */
+  async acceptPendingInvitation(tokenHash: string): Promise<Invitation | null> {
+    return db.$transaction(async (tx) => {
+      const result = await tx.invitation.updateMany({
+        where: {
+          tokenHash,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { acceptedAt: new Date() },
+      });
+      if (result.count === 0) return null;
+      return tx.invitation.findUnique({ where: { tokenHash } });
     });
   }
 }
