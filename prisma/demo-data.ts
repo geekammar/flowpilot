@@ -68,6 +68,9 @@ export function dateIn(now: Date, days: number): string {
 
 export const demoBusiness = {
   name: "عيادة الابتسامة",
+  // Discovery metadata only (operator PROMPT-07) — the product UI stays
+  // vertical-agnostic.
+  vertical: "dental" as const,
   city: "كفر الشيخ",
   whatsappNumber: "+201005551234",
   timezone: BUSINESS_TIMEZONE,

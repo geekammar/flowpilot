@@ -2,16 +2,22 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-06 (ADMIN Activation → Onboarding
-> Integration).
+> Last updated: 2026-09-03 — PROMPT-07 (Onboarding UX Completion).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
 - **Spec in flight:** A — Discovery Foundation + Booking Core (frozen).
 - **Spec A status:** core engine done (auth wiring, onboarding, dashboard,
-  conversations, appointments, polish). Remaining placeholders: customers,
-  services, settings, team, staff area (the `/sign-up` placeholder page
-  remains in code but is no longer a planned deliverable).
+  conversations, appointments, polish). Onboarding restructured in
+  PROMPT-07 into the 4-step operational-foundation wizard (بيانات
+  المنشأة incl. vertical → ساعات العمل → إعدادات الحجز الأساسية →
+  مراجعة وتشغيل) with smart resume (`/onboarding` → first incomplete
+  step / dashboard when completed), step-order guards, back-navigation,
+  a real review summary, and a server-side completion guard (services/
+  knowledge deferred to their own later screens). Remaining
+  placeholders: customers, services, settings, team, staff area (the
+  `/sign-up` placeholder page remains in code but is no longer a planned
+  deliverable).
 - **Auth architecture alignment (Prompt 09) complete — documentation only:**
   invitation-first pilot account creation (Platform Operator provisions
   Business → invites ADMIN → activation → onboarding → ADMIN invites
@@ -70,6 +76,12 @@ Authentication & Authorization Model`.
   workflow.
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
+- **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
+  with `Business.vertical` discovery metadata (nullable TEXT + Zod union
+  `VERTICAL_VALUES` — migration `20260903130000_business_vertical`,
+  authored but not applied on-device), smart resume redirector,
+  step-order guards, review summary with per-step edit links, and a
+  server-authoritative completion guard over the step data only.
 - **Ops:** bootstrap + dev scripts (Win/Linux/macOS/Termux), doctor/verify/
   security tooling, pre-commit secret guard — all tested.
 - **Demo Readiness: READY.** Egyptian demo dataset (عيادة الابتسامة بكفر
@@ -96,13 +108,15 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   Invitation Creation Foundation, v0.3.0 — Invitation Acceptance
   Foundation, and v0.4.0 — ADMIN Account Activation Foundation:
   published on GitHub (2026-09-03, PROMPT-05A). v0.5.0 — ADMIN
-  Activation → Onboarding Integration: published 2026-09-03 (PROMPT-06,
-  via the documented GitHub publication workflow) — every tag is
-  pushed to origin and has a GitHub Release; v0.5.0 is the current
-  Latest. Local `main` and origin `main` are in sync (see
-  `PROJECT_STATUS.md → Release Status`). Open user action: the repo is
-  public but must be private (GITHUB_WORKFLOW.md / DECISIONS #18).
-- **Next step (product):** PROMPT-07 — Customers Directory (Spec A
-  §11: searchable directory, notes, customer history) — then staff
-  area → services → settings → team (`BUILD_STATE.md`).
+  Activation → Onboarding Integration: published 2026-09-03 (PROMPT-06).
+  v0.6.0 — Onboarding UX Completion: published 2026-09-03 (PROMPT-07,
+  via the documented GitHub publication workflow) — every tag is pushed
+  to origin and has a GitHub Release; v0.6.0 is the current Latest.
+  Local `main` and origin `main` are in sync (see `PROJECT_STATUS.md →
+Release Status`). Open user action: the repo is public but must be
+  private (GITHUB_WORKFLOW.md / DECISIONS #18).
+- **Next step (product):** decided by the operator from the updated
+  BUILD_STATE — natural candidates: Services management screen (onboarding
+  no longer creates services, raising its priority) or Customers
+  Directory (Spec A §11); then staff area → settings → team.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

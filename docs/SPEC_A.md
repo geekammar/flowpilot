@@ -30,12 +30,21 @@ collect evidence.
 ### 2. Onboarding
 
 - Runs after invitation-based ADMIN account activation (not after public
-  sign-up): complete Business setup (name, city, WhatsApp number, timezone,
-  about, working hours, cancellation policy)
+  sign-up): the 4-step operational-foundation wizard — بيانات المنشأة
+  (name, vertical, city, WhatsApp number, timezone, optional about), ساعات
+  العمل (working hours), إعدادات الحجز الأساسية (default slot duration +
+  cancellation policy), مراجعة وتشغيل (review + completion) (PROMPT-07)
+- `vertical` is discovery METADATA for Local Vertical Discovery (stable
+  machine key on the Business record) — never permission for vertical-
+  specific UI
 - Links the activated user as `ADMIN` of the business
-- Repeatable checklist pattern for pilot onboarding
-- The onboarding wizard implementation exists and is now reconnected with
-  the invitation-based lifecycle (PROMPT-06: activation hands off through
+- Resumable: `/onboarding` routes to the first incomplete step (completed
+  accounts go straight to the dashboard); progress is server-authoritative
+  on the Business record; completion re-validates all step data
+  server-side and never requires services/knowledge (those screens arrive
+  in later prompts)
+- The onboarding wizard is implemented and connected with the
+  invitation-based lifecycle (PROMPT-06: activation hands off through
   sign-in to the wizard; the wizard area is ADMIN-only)
 
 ### 3. Business Setup

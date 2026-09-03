@@ -14,16 +14,16 @@ Business 1 ──* Appointment     Appointment *──1 Customer / Service / Use
 Business 1 ──* Invitation      Invitation *──1 User?  (nullable invitedBy)
 ```
 
-| Entity       | Table           | Soft delete           | Notes                                                                                                                                                                                                     |
-| ------------ | --------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Business     | `businesses`    | ✔                     | Root tenant. `workingHours` is JSON.                                                                                                                                                                      |
-| User         | `users`         | ✖ (`isActive`)        | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`.                                                                                             |
-| Service      | `services`      | ✔                     | `durationMinutes` drives appointment end times.                                                                                                                                                           |
-| Customer     | `customers`     | ✔                     | Unique per business phone: `@@unique([businessId, phone])`.                                                                                                                                               |
-| Conversation | `conversations` | ✔                     | One active thread per customer flow.                                                                                                                                                                      |
-| Message      | `messages`      | ✖ (immutable log)     | Append-only; deleted with its conversation (cascade).                                                                                                                                                     |
-| Appointment  | `appointments`  | ✔                     | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                                                                                                                     |
-| Invitation   | `invitations`   | ✖ (derived lifecycle) | Domain concept separate from Better Auth (DECISIONS #22). Only the token **hash** is stored (unique). Lifecycle from `acceptedAt`/`revokedAt`/`expiresAt`/`activatedAt` — no status enum, no `deletedAt`. |
+| Entity       | Table           | Soft delete           | Notes                                                                                                                                                                                                                                                                                                                                           |
+| ------------ | --------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business     | `businesses`    | ✔                     | Root tenant. `workingHours` is JSON. `vertical` (nullable TEXT, migration `20260903130000_business_vertical`, PROMPT-07) is discovery METADATA — a stable machine key validated by the Zod union `VERTICAL_VALUES` in `src/lib/validation/business.ts`; extending the list needs no migration and is never permission for vertical-specific UI. |
+| User         | `users`         | ✖ (`isActive`)        | Shared table with Better Auth; domain fields: `businessId`, `role`, `isActive`. Avatar = Better Auth `image`.                                                                                                                                                                                                                                   |
+| Service      | `services`      | ✔                     | `durationMinutes` drives appointment end times.                                                                                                                                                                                                                                                                                                 |
+| Customer     | `customers`     | ✔                     | Unique per business phone: `@@unique([businessId, phone])`.                                                                                                                                                                                                                                                                                     |
+| Conversation | `conversations` | ✔                     | One active thread per customer flow.                                                                                                                                                                                                                                                                                                            |
+| Message      | `messages`      | ✖ (immutable log)     | Append-only; deleted with its conversation (cascade).                                                                                                                                                                                                                                                                                           |
+| Appointment  | `appointments`  | ✔                     | `date` (@db.Date) + `startTime`/`endTime` (@db.Time).                                                                                                                                                                                                                                                                                           |
+| Invitation   | `invitations`   | ✖ (derived lifecycle) | Domain concept separate from Better Auth (DECISIONS #22). Only the token **hash** is stored (unique). Lifecycle from `acceptedAt`/`revokedAt`/`expiresAt`/`activatedAt` — no status enum, no `deletedAt`.                                                                                                                                       |
 
 ## Enums
 
@@ -271,15 +271,15 @@ at this layer, no onboarding, no STAFF activation):
 
 Zod v4 schemas per entity, Arabic error messages:
 
-| File              | Exports                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| `common.ts`       | `uuidSchema`, `phoneSchema`, `emailSchema`, `timeSchema`, working-hours schemas, pagination helpers |
-| `business.ts`     | `CreateBusinessDto`, `UpdateBusinessDto`                                                            |
-| `service.ts`      | `CreateServiceDto`, `UpdateServiceDto`                                                              |
-| `customer.ts`     | `CreateCustomerDto`, `UpdateCustomerDto`                                                            |
-| `conversation.ts` | conversation + message DTOs and status/sender literal unions                                        |
-| `appointment.ts`  | appointment DTOs (cross-field refine: end > start), status union                                    |
-| `user.ts`         | user DTOs (identity itself stays in Better Auth)                                                    |
+| File              | Exports                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `common.ts`       | `uuidSchema`, `phoneSchema`, `emailSchema`, `timeSchema`, working-hours schemas, pagination helpers                      |
+| `business.ts`     | `CreateBusinessDto`, `UpdateBusinessDto`, `VERTICALS`/`VERTICAL_VALUES`/`VERTICAL_LABELS` + `verticalSchema` (PROMPT-07) |
+| `service.ts`      | `CreateServiceDto`, `UpdateServiceDto`                                                                                   |
+| `customer.ts`     | `CreateCustomerDto`, `UpdateCustomerDto`                                                                                 |
+| `conversation.ts` | conversation + message DTOs and status/sender literal unions                                                             |
+| `appointment.ts`  | appointment DTOs (cross-field refine: end > start), status union                                                         |
+| `user.ts`         | user DTOs (identity itself stays in Better Auth)                                                                         |
 
 DTOs are the repository input contract — controllers/routes validate with
 Zod, then pass typed DTOs down. Never pass raw request objects further.
@@ -333,8 +333,9 @@ pnpm db:studio    # inspect
 
 Seeds:
 
-- Business: working hours (الجمعة مساءً فقط), 5 FAQs (أسعار/تأمين/أطفال/
-  عنوان/تقسيط), cancellation policy, completed onboarding
+- Business: vertical `dental` (discovery metadata), working hours (الجمعة
+  مساءً فقط), 5 FAQs (أسعار/تأمين/أطفال/عنوان/تقسيط), cancellation policy,
+  completed onboarding
 - Team with Better Auth credential accounts — demo login:
   `admin@flowpilot.app` / `Admin@1234` (د. سارة محمود الشريف) and
   `staff@flowpilot.app` / `Staff@1234` (نورهان السيد) — demo DBs only

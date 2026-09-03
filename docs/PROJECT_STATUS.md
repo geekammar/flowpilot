@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-06 —
-> ADMIN Activation → Onboarding Integration).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-07 —
+> Onboarding UX Completion).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -13,27 +13,27 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 
 ## Current Status (Spec A progress)
 
-| Area                                                     | State                                  |
-| -------------------------------------------------------- | -------------------------------------- |
-| Foundation (stack, auth, env, tooling)                   | ✅ complete                            |
-| Design system, RTL, responsive, PWA                      | ✅ complete                            |
-| Database layer (schema, repos, seed)                     | ✅ complete                            |
-| Onboarding wizard                                        | ✅ complete                            |
-| Business admin dashboard                                 | ✅ complete                            |
-| Conversations inbox + detail                             | ✅ complete                            |
-| Appointments agenda/detail/create                        | ✅ complete                            |
-| UX/A11y/PWA polish pass                                  | ✅ complete                            |
-| Auth architecture alignment (docs)                       | ✅ complete (Prompt 09, DECISIONS #22) |
-| Invitation data model (schema/migration/repo/validation) | ✅ complete (Prompt 10)                |
-| Invitation creation foundation (service layer)           | ✅ complete (PROMPT-03)                |
-| Invitation acceptance foundation (service layer)         | ✅ complete (PROMPT-04)                |
-| ADMIN account activation (Better Auth + membership)      | ✅ complete (PROMPT-05, service layer) |
-| Activation → onboarding integration                      | ✅ complete (PROMPT-06)                |
-| Customers directory                                      | ⏳ placeholder (next — PROMPT-07)      |
-| Services management                                      | ⏳ placeholder                         |
-| Business settings / knowledge screens                    | ⏳ placeholder                         |
-| Team management (admin)                                  | ⏳ placeholder                         |
-| Staff area                                               | ⏳ placeholder                         |
+| Area                                                         | State                                  |
+| ------------------------------------------------------------ | -------------------------------------- |
+| Foundation (stack, auth, env, tooling)                       | ✅ complete                            |
+| Design system, RTL, responsive, PWA                          | ✅ complete                            |
+| Database layer (schema, repos, seed)                         | ✅ complete                            |
+| Onboarding wizard (4-step operational foundation, PROMPT-07) | ✅ complete                            |
+| Business admin dashboard                                     | ✅ complete                            |
+| Conversations inbox + detail                                 | ✅ complete                            |
+| Appointments agenda/detail/create                            | ✅ complete                            |
+| UX/A11y/PWA polish pass                                      | ✅ complete                            |
+| Auth architecture alignment (docs)                           | ✅ complete (Prompt 09, DECISIONS #22) |
+| Invitation data model (schema/migration/repo/validation)     | ✅ complete (Prompt 10)                |
+| Invitation creation foundation (service layer)               | ✅ complete (PROMPT-03)                |
+| Invitation acceptance foundation (service layer)             | ✅ complete (PROMPT-04)                |
+| ADMIN account activation (Better Auth + membership)          | ✅ complete (PROMPT-05, service layer) |
+| Activation → onboarding integration                          | ✅ complete (PROMPT-06)                |
+| Customers directory                                          | ⏳ placeholder (next — PROMPT-07)      |
+| Services management                                          | ⏳ placeholder                         |
+| Business settings / knowledge screens                        | ⏳ placeholder                         |
+| Team management (admin)                                      | ⏳ placeholder                         |
+| Staff area                                                   | ⏳ placeholder                         |
 
 Auth note (Prompts 09–10 + PROMPT-03/04/05/06): account creation for
 the pilot stage is invitation-first — the Platform Operator provisions
@@ -51,9 +51,15 @@ identity creation, one identity per email, one-time atomic
 `activatedAt` + Business ADMIN membership), AND the activation →
 onboarding integration (public `/invite/[token]` activation route
 composing accept + activate, safe sign-in → onboarding handoff,
-ADMIN-only onboarding guard) are implemented. Not yet implemented:
-token delivery, invitation creation UI (Team management), and the
-STAFF activation workflow.
+ADMIN-only onboarding guard) are implemented. Onboarding was
+restructured in PROMPT-07 into the 4-step operational-foundation wizard
+(بيانات المنشأة incl. vertical discovery metadata → ساعات العمل →
+إعدادات الحجز الأساسية → مراجعة وتشغيل) with smart resume, step-order
+guards, a review summary, and a server-side completion guard over the
+step data only — services/knowledge management moved out of onboarding
+into their own upcoming Spec A screens. Not yet implemented: token
+delivery, invitation creation UI (Team management), and the STAFF
+activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -150,6 +156,15 @@ activation`); the tag is pushed to origin and the GitHub Release
   doctor gate still blocks on this device's placeholder
   `DATABASE_URL` (device-local, user action) and was not used, per
   the operator's instruction for operations-only publication.
+- **v0.6.0 — Onboarding UX Completion: PUBLISHED** (2026-09-03,
+  PROMPT-07 — current Latest release). Annotated tag `v0.6.0` points at
+  the PROMPT-07 commit (`feat(onboarding): improve business onboarding
+experience`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.6.0 — Onboarding UX Completion" exists. Published
+  through the documented GitHub publication workflow (PROMPT-05A/06
+  pattern); the legacy `pnpm release` doctor gate still blocks on this
+  device's placeholder `DATABASE_URL` (device-local, user action) and
+  was not used, per the operator's instruction.
 - Publication history was reconciled by PROMPT-05A (operations-only):
   local `main` was already current on origin (no commit push needed);
   the three missing tags were pushed normally (no force) and the
@@ -165,10 +180,12 @@ activation`); the tag is pushed to origin and the GitHub Release
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: customers directory
-(PROMPT-07, next) → staff area → services → settings → team, which
-includes the STAFF invitation/activation UX and composes the existing
-invitation services). Spec A exit criteria live in `ROADMAP.md`.
+**Finish Spec A first** (recommended order: services management screen
+(PROMPT-07 removed service creation from onboarding, raising its
+priority) or customers directory — next prompt decided by the operator —
+then staff area → settings → team, which includes the STAFF
+invitation/activation UX and composes the existing invitation
+services). Spec A exit criteria live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

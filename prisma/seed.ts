@@ -63,6 +63,7 @@ async function main() {
     where: { id: DEMO_IDS.business },
     update: {
       name: demoBusiness.name,
+      vertical: demoBusiness.vertical,
       city: demoBusiness.city,
       whatsappNumber: demoBusiness.whatsappNumber,
       timezone: BUSINESS_TIMEZONE,
@@ -77,6 +78,7 @@ async function main() {
     create: {
       id: DEMO_IDS.business,
       name: demoBusiness.name,
+      vertical: demoBusiness.vertical,
       city: demoBusiness.city,
       whatsappNumber: demoBusiness.whatsappNumber,
       timezone: BUSINESS_TIMEZONE,

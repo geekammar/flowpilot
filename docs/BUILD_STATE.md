@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-06 (ADMIN Activation → Onboarding Integration).
+> Last updated: PROMPT-07 (Onboarding UX Completion).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1848,9 +1848,173 @@ public-path helper), `src/app/(onboarding)/layout.tsx` (ADMIN guard),
 
 ---
 
+## PROMPT-07 — Onboarding UX Completion
+
+**Status:** ✅ Complete
+
+> Operator prompt: COMPLETE and IMPROVE the existing Business Admin
+> onboarding (no rebuild, no unrelated Spec A areas). Restructured the
+> six-screen wizard (welcome + business + services + availability +
+> knowledge + complete) into the 4-step operational-foundation wizard —
+> services/knowledge management are explicitly deferred to later prompts
+> per the operator's scope. Note: the earlier ledger "Next Step"
+> (Customers Directory) was superseded by the operator choosing this
+> onboarding prompt as PROMPT-07; the next product prompt is decided by
+> the operator from this updated state.
+
+### ALREADY PRESENT (reused, not rebuilt)
+
+- ADMIN-only `(onboarding)` layout guard (`requireRole("ADMIN")`),
+  two-tier auth model, wizard shell, StepHeader, React Hook Form + Zod
+  per-step validation with Arabic messages
+- Debounced autosave (`use-autosave`) + `SaveIndicator` —
+  server-authoritative persistence through server actions
+- Transactional Business creation + ADMIN assignment
+  (`createForUser`), tenant ownership via the session user (businessId
+  never client-controlled)
+- Business working-hours JSON model (single open/close period per day),
+  `slotDurationMinutes`, `faqs`, `cancellationPolicy`, `about`,
+  `onboardingCompletedAt` fields (DECISIONS #13)
+- Dashboard-root → onboarding redirect for incomplete accounts
+
+### IMPROVED
+
+- **Wizard restructure to 4 steps** (Step 1/4 بيانات المنشأة → Step 2/4
+  ساعات العمل → Step 3/4 إعدادات الحجز الأساسية → Step 4/4 مراجعة
+  وتشغيل): progress bar, step counter, and step nav rebuilt for 4 steps;
+  completed steps are now clickable links (safe back-navigation);
+  steps 2–4 gained explicit رجوع buttons
+- **`/onboarding` is now a smart resume redirector**: first step whose
+  data is missing/invalid (server-authoritative from the Business
+  record), or straight to `/` when onboarding is already completed —
+  completed accounts can no longer walk into the wizard uninvited
+- **Step-order guards**: hours/booking/review pages redirect back to
+  the first invalid step, so no step can be reached with prerequisite
+  data missing (direct URL entry included)
+- **Review step** now shows a real summary (business info, per-day
+  hours, booking settings) with تعديل links per section and a clear
+  تشغيل المنشأة completion action — previously a bare confirmation
+  card with no summary
+- **Completion guard** re-validates the 4-step core data
+  server-side (business incl. vertical, working hours, slot duration +
+  cancellation policy) — services/knowledge are no longer onboarding
+  requirements (they belong to their later Spec A screens); invalid
+  data can never complete silently
+- `about` moved into step 1 as an OPTIONAL short description (was a
+  required knowledge-step field)
+
+### ADDED
+
+- **`Business.vertical`** — the only schema change, genuinely required
+  by the operator's STEP A + discovery-metadata requirement: nullable
+  `TEXT` column + migration `20260903130000_business_vertical` (SQL
+  authored on-device in Prisma's migration style — the schema engine
+  cannot execute on Termux; apply from desktop/CI with `pnpm
+db:deploy`). Values are stable machine keys validated by a Zod union
+  (`VERTICAL_VALUES`/`VERTICAL_LABELS`/`verticalSchema` in
+  `src/lib/validation/business.ts`: dental, beauty, coaching, gym,
+  education, home_services, other) — no Prisma enum, so extending the
+  list (Spec B Vertical Registry) needs no migration. Vertical is
+  metadata for Local Vertical Discovery ONLY, never permission for
+  vertical-specific UI
+- **Step 3 (booking basics)**: slot-duration select + cancellation
+  policy + `saveBookingBasics` action
+- **`getOnboardingProgress`** (`src/features/onboarding/server/
+onboarding-progress.ts`): single source of truth for step validity,
+  resume target, and completion gating (used by the redirector, step
+  guards, review page, and the completion action)
+- **Seed**: demo business now carries `vertical: "dental"`
+
+### NOT IMPLEMENTED (later prompts — per operator scope)
+
+- Services management screen (the wizard no longer manages services;
+  Service model/repository untouched and appointments keep working)
+- Business knowledge management screen (FAQs remain a Business field,
+  seeded and ready; no onboarding UI for them)
+- Booking confirmation preferences (NOT in the domain model — the
+  operator's "only if already supported" rule applies)
+- Multiple working periods per day (the existing model supports a
+  single open/close period; preserved as-is)
+
+### Generated / Changed Files
+
+Routes: `src/app/(onboarding)/onboarding/{page,business/page,hours/page,
+booking/page,review/page}.tsx`; removed `services/`, `knowledge/`,
+`availability/`, `complete/` routes. Feature:
+`src/features/onboarding/{actions/onboarding-actions.ts, components/
+{onboarding-shell,business-setup-form,working-hours-form,booking-basics-
+form,review-card}.tsx, schemas/onboarding-schema.ts, server/
+onboarding-progress.ts, types.ts}`; removed `services-form.tsx`,
+`knowledge-form.tsx`, `availability-form.tsx`, `completion-card.tsx`.
+Data: `prisma/schema.prisma` (+vertical),
+`prisma/migrations/20260903130000_business_vertical/migration.sql`,
+`prisma/{demo-data,seed}.ts`, `src/lib/validation/business.ts`. Docs:
+`SPEC_A.md`, `DATABASE.md`, `CURRENT_STATE.md`, `PROJECT_STATUS.md`,
+this file. `package.json` version → 0.6.0.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..06 pattern): **59/59 checks passed** offline — step-schema
+  validation (vertical required with Arabic message, about optional
+  incl. null/empty, hours all-closed + close-before-open + missing-day
+  - bad-format rejections, booking basics bounds + policy min/max),
+    resume/guard resolution for every progress state (no business,
+    missing vertical, missing hours, missing policy, all-valid, completed
+    → dashboard, seed-like completed business not looped, legacy
+    mid-onboarding business recovers at step 1), vertical-constant
+    consistency (unique keys, labels exhaustive, "other" present,
+    unknown values rejected), and the new route layout on disk
+- `pnpm verify` full gate: PASSED ✅ (lint 46.2s · typecheck 43.3s ·
+  format 34.4s · build --webpack 265.0s) — the four onboarding routes
+  compiled as dynamic routes
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated): live-DB
+  behavior of the wizard (this device has a placeholder `DATABASE_URL`
+  and cannot run the Prisma schema engine). Migration
+  `20260903130000_business_vertical` is authored but NOT applied
+  on-device — apply from desktop/CI with `pnpm db:deploy` before using
+  the wizard against a real database. The offline harness verifies the
+  full progress/validation logic around the repository primitives.
+
+### Known Limitations
+
+- Businesses completing onboarding now land operational WITHOUT
+  services (services arrive via their own Spec A screen, per the
+  operator's flow: Onboarding → Operational → Services). Until that
+  screen exists, a newly onboarded ADMIN cannot add services through
+  the UI — appointments (which require a service) become creatable
+  after the Services prompt lands.
+- Old wizard URLs (`/onboarding/services|knowledge|availability|
+complete`) now 404 — no external links reference them (verified by
+  source sweep); the wizard is entered via `/onboarding` only.
+- Migration + live wizard flow await desktop/CI application against
+  Neon (same as the invitation migrations `20260902120000` and
+  `20260903120000`).
+
+### Release
+
+- Commit `feat(onboarding): improve business onboarding experience`;
+  `package.json` version bumped to 0.6.0 (MINOR — product feature; the
+  `/api/health` endpoint reports the version).
+- Annotated tag `v0.6.0` — Onboarding UX Completion — points at the
+  PROMPT-07 commit. Published through the documented GitHub publication
+  workflow (PROMPT-05A/06 pattern: git state → origin identity → gh
+  auth → push main → verify tag target → push tag only →
+  `gh release create --verify-tag` → verify release published). The
+  legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's prompt instruction.
+
+---
+
 ## Current State Summary
 
-- **Spec A progress:** foundation, onboarding, owner dashboard,
+- **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
+  to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
+  العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
+  capture, smart resume, step guards, and a real review step; services/
+  knowledge deferred to their own screens), owner dashboard,
   Conversations, Appointments, and a full polish pass (loading/error/
   empty states, a11y, PWA PNG icons, demo-ready seed) are complete.
   Still placeholders: Customers directory, Services management, Business
@@ -1957,8 +2121,12 @@ password}` input and typed Arabic error mapping, safe sign-in →
   `docs/DOCS_INDEX.md`, Tier 3 historical preserved. No product code or
   canonical documentation content changed; stale status claims in
   PRODUCT_GLOSSARY / PROJECT_README corrected.
-- **Next Step:** PROMPT-07 — Customers Directory (Spec A §11:
-  searchable directory, notes, customer history via conversations +
-  appointments). Do NOT combine with Team management or the STAFF
-  activation workflow. Then staff area → services → settings → team.
+- **Next Step:** the next product prompt is decided by the operator from
+  this updated state. Natural Spec A candidates: **Services management
+  screen** (PROMPT-07 removed service creation from onboarding, raising
+  its priority — a newly onboarded business cannot add services through
+  the UI until it exists) and **Customers Directory** (Spec A §11). Do
+  NOT combine unrelated areas. Then staff area → settings → team (team
+  includes the STAFF invitation/activation UX composing the existing
+  invitation services).
 - After each prompt: update this file and `DECISIONS.md`.

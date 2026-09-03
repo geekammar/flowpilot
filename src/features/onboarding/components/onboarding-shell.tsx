@@ -7,12 +7,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const STEPS = [
-  { href: "/onboarding", label: "مرحباً" },
-  { href: "/onboarding/business", label: "المنشأة" },
-  { href: "/onboarding/services", label: "الخدمات" },
-  { href: "/onboarding/availability", label: "المواعيد" },
-  { href: "/onboarding/knowledge", label: "المعلومات" },
-  { href: "/onboarding/complete", label: "اكتمل" },
+  { href: "/onboarding/business", label: "بيانات المنشأة" },
+  { href: "/onboarding/hours", label: "ساعات العمل" },
+  { href: "/onboarding/booking", label: "إعدادات الحجز" },
+  { href: "/onboarding/review", label: "المراجعة والتشغيل" },
 ] as const;
 
 export function OnboardingShell({ children }: { children: React.ReactNode }) {
@@ -32,6 +30,7 @@ export function OnboardingShell({ children }: { children: React.ReactNode }) {
           </Link>
           <span className="ms-auto text-xs text-muted-foreground">
             الخطوة {currentIndex + 1} من {STEPS.length}
+            <span className="hidden sm:inline"> — إعداد منشأتك</span>
           </span>
         </div>
         <div
@@ -50,35 +49,49 @@ export function OnboardingShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <nav aria-label="خطوات الإعداد" className="border-b bg-card">
-        <ol className="mx-auto grid max-w-4xl grid-cols-6 px-2 sm:px-6">
+        <ol className="mx-auto grid max-w-4xl grid-cols-4 px-2 sm:px-6">
           {STEPS.map((step, index) => {
             const complete = index < currentIndex;
             const current = index === currentIndex;
-            return (
-              <li key={step.href} className="min-w-0">
-                <div
-                  aria-current={current ? "step" : undefined}
+            const content = (
+              <>
+                <span
                   className={cn(
-                    "flex h-12 items-center justify-center gap-1.5 border-b-2 border-transparent px-1 text-xs text-muted-foreground",
-                    current && "border-primary font-medium text-foreground",
-                    complete && "text-foreground",
+                    "flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] tabular-nums",
+                    current &&
+                      "border-primary bg-primary text-primary-foreground",
+                    complete &&
+                      "border-success bg-success text-success-foreground",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] tabular-nums",
-                      current &&
-                        "border-primary bg-primary text-primary-foreground",
-                      complete &&
-                        "border-success bg-success text-success-foreground",
-                    )}
+                  {complete ? <CheckIcon className="size-3" /> : index + 1}
+                </span>
+                <span className="hidden truncate sm:inline">{step.label}</span>
+              </>
+            );
+            const className = cn(
+              "flex h-12 w-full items-center justify-center gap-1.5 border-b-2 border-transparent px-1 text-xs text-muted-foreground",
+              current && "border-primary font-medium text-foreground",
+              complete && "text-foreground hover:text-primary",
+            );
+            return (
+              <li key={step.href} className="min-w-0">
+                {complete ? (
+                  <Link
+                    href={step.href}
+                    className={className}
+                    aria-label={`العودة إلى خطوة: ${step.label}`}
                   >
-                    {complete ? <CheckIcon className="size-3" /> : index + 1}
-                  </span>
-                  <span className="hidden truncate sm:inline">
-                    {step.label}
-                  </span>
-                </div>
+                    {content}
+                  </Link>
+                ) : (
+                  <div
+                    aria-current={current ? "step" : undefined}
+                    className={className}
+                  >
+                    {content}
+                  </div>
+                )}
               </li>
             );
           })}

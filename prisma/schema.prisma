@@ -46,6 +46,11 @@ enum AppointmentStatus {
 model Business {
   id                 String    @id @default(uuid())
   name               String
+  // Discovery metadata (operator PROMPT-07): the business's vertical as a
+  // stable machine key validated by Zod (`VERTICALS` in lib/validation).
+  // Metadata for Local Vertical Discovery ONLY — never permission for
+  // vertical-specific UI (PRODUCT_VISION / DECISIONS #22 context).
+  vertical           String?
   city               String?
   whatsappNumber     String
    timezone           String    @default("Asia/Riyadh")

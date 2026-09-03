@@ -4,6 +4,7 @@ import { saveBusinessSetup } from "@/features/onboarding/actions/onboarding-acti
 import { SaveIndicator } from "@/features/onboarding/components/save-indicator";
 import { useAutosave } from "@/features/onboarding/hooks/use-autosave";
 import {
+  TIMEZONES,
   businessSetupSchema,
   type BusinessSetupInput,
 } from "@/features/onboarding/schemas/onboarding-schema";
@@ -17,23 +18,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { VERTICALS } from "@/lib/validation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
-
-const TIMEZONES = [
-  { value: "Africa/Cairo", label: "القاهرة (توقيت مصر)" },
-  { value: "Asia/Riyadh", label: "الرياض" },
-  { value: "Asia/Dubai", label: "دبي" },
-] as const;
+import {
+  Controller,
+  useForm,
+  useWatch,
+  type DefaultValues,
+} from "react-hook-form";
 
 export function BusinessSetupForm({
   defaultValues,
 }: {
-  defaultValues: BusinessSetupInput;
+  defaultValues: DefaultValues<BusinessSetupInput>;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -60,34 +62,79 @@ export function BusinessSetupForm({
       return;
     }
     autosave.setState("saved");
-    startTransition(() => router.push("/onboarding/services"));
+    startTransition(() => router.push("/onboarding/hours"));
   });
 
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="اسم المنشأة" error={form.formState.errors.name?.message}>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="business-name">اسم المنشأة</Label>
           <Input
+            id="business-name"
             autoFocus
             autoComplete="organization"
             placeholder="مثال: مركز الوفاء"
             aria-invalid={Boolean(form.formState.errors.name)}
             {...form.register("name")}
           />
-        </Field>
-        <Field label="المدينة" error={form.formState.errors.city?.message}>
+          {form.formState.errors.name ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.name.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="business-vertical">نوع المنشأة</Label>
+          <Controller
+            control={form.control}
+            name="vertical"
+            render={({ field }) => (
+              <Select
+                value={field.value || undefined}
+                onValueChange={field.onChange}
+              >
+                <SelectTrigger id="business-vertical" className="w-full">
+                  <SelectValue placeholder="اختر نوع المنشأة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VERTICALS.map((vertical) => (
+                    <SelectItem key={vertical.value} value={vertical.value}>
+                      {vertical.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {form.formState.errors.vertical ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.vertical.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="business-city">المدينة</Label>
           <Input
+            id="business-city"
             autoComplete="address-level2"
             placeholder="مثال: كفر الشيخ"
             aria-invalid={Boolean(form.formState.errors.city)}
             {...form.register("city")}
           />
-        </Field>
-        <Field
-          label="رقم واتساب"
-          error={form.formState.errors.whatsappNumber?.message}
-        >
+          {form.formState.errors.city ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.city.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="business-whatsapp">رقم واتساب</Label>
           <Input
+            id="business-whatsapp"
             type="tel"
             dir="ltr"
             autoComplete="tel"
@@ -96,17 +143,21 @@ export function BusinessSetupForm({
             aria-invalid={Boolean(form.formState.errors.whatsappNumber)}
             {...form.register("whatsappNumber")}
           />
-        </Field>
-        <Field
-          label="المنطقة الزمنية"
-          error={form.formState.errors.timezone?.message}
-        >
+          {form.formState.errors.whatsappNumber ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.whatsappNumber.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="business-timezone">المنطقة الزمنية</Label>
           <Controller
             control={form.control}
             name="timezone"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="business-timezone" className="w-full">
                   <SelectValue placeholder="اختر المنطقة الزمنية" />
                 </SelectTrigger>
                 <SelectContent>
@@ -119,7 +170,31 @@ export function BusinessSetupForm({
               </Select>
             )}
           />
-        </Field>
+          {form.formState.errors.timezone ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.timezone.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="business-about">
+            نبذة عن المنشأة{" "}
+            <span className="font-normal text-muted-foreground">(اختياري)</span>
+          </Label>
+          <Textarea
+            id="business-about"
+            rows={3}
+            placeholder="وصف قصير يعرّف العملاء بمنشأتك."
+            aria-invalid={Boolean(form.formState.errors.about)}
+            {...form.register("about")}
+          />
+          {form.formState.errors.about ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.about.message}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -137,23 +212,5 @@ export function BusinessSetupForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-    </div>
   );
 }
