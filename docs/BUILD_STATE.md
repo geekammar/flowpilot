@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-05A (GitHub Release Publication Recovery).
+> Last updated: PROMPT-05B (Context Compression & Documentation Index).
 
 ## Prompt 01 — Repository Foundation
 
@@ -1534,6 +1534,138 @@ it in ops prompts.
 
 ---
 
+## PROMPT-05B — Context Compression & Documentation Index
+
+**Status:** ✅ Complete (documentation-only)
+
+> Context-efficiency pass: restructure how agents LOAD documentation
+> without deleting any project memory. No application code, schema,
+> migrations, Better Auth behavior, UI, or product scope changed. No
+> canonical source rewritten; no DECISIONS entry added (no new engineering
+> decision — the reading policy is procedural and lives in
+> `AGENT_RULES.md` / `DOCS_INDEX.md`).
+
+### Audited
+
+- Full `docs/` inventory: 35 existing files (now 37 with the two new
+  ones), every file read or skimmed and classified by purpose and
+  authority.
+- Duplication audit: current-state summaries exist in 4 places
+  (`BUILD_STATE.md` Current State Summary = canonical;
+  `CURRENT_STATE.md` / `PROJECT_STATUS.md` / `PROJECT_README.md` =
+  derived and already reconciled by PROMPT-05A); product identity ×3,
+  architecture ×2, deployment/release status ×4. Derived summaries defer
+  to canonical files — kept, not merged.
+- Stale-reference audit (authority order: DECISIONS → BUILD_STATE →
+  CURRENT_STATE/PROJECT_STATUS → other docs → historical reports):
+  - `PRODUCT_GLOSSARY.md`: Invitation + Account Activation were marked
+    "Planned — not yet implemented" — false since PROMPT-03/04/05
+    (service layer). Corrected; Business Activation clarified (wizard
+    implemented, formal lifecycle states still planned).
+  - `PROJECT_README.md`: build status claimed "Prompts 01–03 complete …
+    nothing else exists yet" — false since Prompt 04–08. Corrected to the
+    current state; "How to continue" now points to the tiered model.
+  - `CONTEXT_RECOVERY.md`: env setup said `cp .env.example .env` —
+    corrected to `.env.local` (DECISIONS #16 convention).
+  - Old prompt numbering elsewhere is self-consistent (the ledger
+    explains the operator-series restart in the Prompt 10 section).
+
+### Created
+
+- `docs/CORE_CONTEXT.md` — compact DERIVED orientation summary (what
+  FlowPilot is, strategy, spec, architecture, auth model, constraints,
+  state, next step, non-negotiables, canonical-file map). Explicitly
+  states it must never override canonical files.
+- `docs/DOCS_INDEX.md` — tiered index of all 37 documentation files
+  (File / Tier / Purpose / Read When / Authority) + the binding reading
+  policy.
+
+### Modified
+
+- `docs/CONTEXT_RECOVERY.md` — recovery flow changed from "read all
+  memory files" (10 files) to the tiered process: CORE_CONTEXT →
+  BUILD_STATE → DECISIONS → AGENT_RULES → determine task → select
+  Tier 1/2 via DOCS_INDEX → read those → implement Next Step.
+  Preserves the rule that canonical files remain authoritative and
+  CORE_CONTEXT is derived.
+- `docs/AGENT_RULES.md` — minimal change: "Before Making Any Changes"
+  and the Prompt Lifecycle now use the tiered model (always Tier 0;
+  Tier 1/2 by task relevance; never treat CORE_CONTEXT as
+  authoritative; never skip BUILD_STATE/DECISIONS; never delete
+  documentation merely for context reduction). All engineering rules
+  preserved verbatim.
+- `docs/PRODUCT_GLOSSARY.md`, `docs/PROJECT_README.md` — stale-claim
+  fixes above.
+- This file (this section + Current State Summary bullet).
+
+### Deliberately preserved
+
+- All `DECISIONS.md` history (byte-identical — verified via git diff).
+- All historical prompt sections in this ledger.
+- All Tier 3 audits/reports (PROJECT_AUDIT, VERCEL_AUDIT,
+  PILOT_DISTRIBUTION_AUDIT, DEPLOYMENT_REPORT, RELEASE_REPORT,
+  PILOT_DISTRIBUTION_REPORT).
+- All canonical sources (PROJECT_VISION, PRODUCT_STRATEGY,
+  ARCHITECTURE, SPEC_A, ROADMAP, DATABASE, DESIGN_SYSTEM,
+  PRODUCT_GLOSSARY content beyond the stale status notes).
+- No document deleted or merged.
+
+### Documentation tiers (new model)
+
+- **Tier 0 — always read:** CORE_CONTEXT, BUILD_STATE, DECISIONS,
+  AGENT_RULES (+ DOCS_INDEX for navigation).
+- **Tier 1 — read when relevant:** vision, strategy, architecture,
+  SPEC_A, roadmap, database, design system, glossary, UX plan,
+  CONTEXT_RECOVERY procedure, status snapshots (CURRENT_STATE,
+  PROJECT_STATUS, PROJECT_README).
+- **Tier 2 — operational/specialized:** setup/dev/quality/troubleshooting/
+  env-vars/release/GitHub/deploy×3/deployment-status/demo×3.
+- **Tier 3 — historical/reference:** the six audits/reports (never
+  required session context; never deleted).
+
+### Token-efficiency rationale
+
+Cold-start mandatory reading drops from 10 files (~190 KB) to 4 Tier-0
+files (~152 KB including the new ~5 KB CORE_CONTEXT), and ~44 KB of
+Tier 1 plus all Tier 2/3 docs become task-dependent loads selected via
+DOCS_INDEX. Goal was fewer tokens per session, not fewer files —
+canonical detail and history remain intact.
+
+### Verification
+
+- All 37 files referenced in DOCS_INDEX.md exist; every `docs/*.md`
+  file is indexed (bijective check) ✅
+- CORE_CONTEXT.md contains the derived/no-override disclaimer ✅
+- CONTEXT_RECOVERY.md and AGENT_RULES.md agree on the tier model and
+  cross-reference each other + DOCS_INDEX ✅
+- `git diff` confirms DECISIONS.md untouched (and no application code,
+  schema, migration, env, or generated files staged) ✅
+- Prettier format on all changed docs ✅
+- `pnpm verify` full gate: PASSED (lint 87.0s · typecheck 37.1s ·
+  format 50.4s · build --webpack 394.7s) ✅ — no source modified; run
+  per the AGENT_RULES quality gate (Prompt 09 precedent)
+
+### Known Limitations / Unresolved Items
+
+- None UNCERTAIN. One observation (not fixed — pre-existing, harmless):
+  `FLOWPILOT_UX_IMPROVEMENTS_14.md`'s file-name suffix predates the
+  operator prompt-series restart; its content is current.
+- Remaining user action unchanged: make the GitHub repository private
+  (see PROMPT-05A).
+
+### Release
+
+- One documentation commit: `docs(context): optimize agent documentation
+loading`. No tag (documentation-maintenance pass; GITHUB_WORKFLOW
+  requires tags for product releases only). `main` pushed to origin.
+
+### Next Step (product — unchanged)
+
+PROMPT-06 — ADMIN Activation → Onboarding Integration. Do NOT implement
+it in documentation/ops prompts.
+
+---
+
 ## Current State Summary
 
 - **Spec A progress:** foundation, onboarding, owner dashboard,
@@ -1623,6 +1755,12 @@ it in ops prompts.
   and local/remote `main` are in sync. Remaining user action: make the
   GitHub repository private (it is currently public; see the
   PROMPT-05A section).
+- **Documentation tier model (PROMPT-05B, docs-only) complete:** agent
+  context loading is now tiered — Tier 0 always (CORE_CONTEXT →
+  BUILD_STATE → DECISIONS → AGENT_RULES), Tier 1/2 by task relevance via
+  `docs/DOCS_INDEX.md`, Tier 3 historical preserved. No product code or
+  canonical documentation content changed; stale status claims in
+  PRODUCT_GLOSSARY / PROJECT_README corrected.
 - **Next Step:** PROMPT-06 — ADMIN Activation → Onboarding Integration
   (connect the activated ADMIN into the existing onboarding wizard;
   compose accept + activate at the route layer when the activation UI

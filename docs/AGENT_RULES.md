@@ -3,19 +3,25 @@
 > Binding rules for every AI agent (and human contributor) working on
 > FlowPilot. Ignorance of these rules is not an excuse; they exist so that any
 > agent can continue the project safely after all context is lost.
-> Last updated: Prompt 09 (auth model alignment).
+> Last updated: PROMPT-05B (tiered context-loading model).
 
 ## Before Making Any Changes
 
-Read, in order:
+Load the Tier 0 context (always, in order — full procedure:
+`CONTEXT_RECOVERY.md`, doc map: `DOCS_INDEX.md`):
 
-1. `docs/PROJECT_VISION.md` — what FlowPilot is and is not
-2. `docs/PRODUCT_STRATEGY.md` — current market strategy and success metrics
-3. `docs/ARCHITECTURE.md` — stack, patterns, forbidden changes
-4. `docs/SPEC_A.md` — the frozen scope
-5. `docs/ROADMAP.md` — what spec comes next
-6. `docs/DECISIONS.md` — accepted decisions (binding)
-7. `docs/BUILD_STATE.md` — what exists and what is next
+1. `docs/CORE_CONTEXT.md` — compact orientation (derived, never overrides
+   canonical files)
+2. `docs/BUILD_STATE.md` — what exists and what is next (ledger)
+3. `docs/DECISIONS.md` — accepted decisions (binding)
+4. `docs/AGENT_RULES.md` — this file
+
+Then load Tier 1/2 files **only as the task requires**, selected via
+`docs/DOCS_INDEX.md` (e.g., product work → `SPEC_A.md`; any code →
+`ARCHITECTURE.md`; DB work → `DATABASE.md`; UI work → `DESIGN_SYSTEM.md`;
+deployment → Vercel/deployment docs). Never skip `BUILD_STATE.md` or
+`DECISIONS.md`; never treat `CORE_CONTEXT.md` as authoritative; never
+delete documentation merely for context reduction.
 
 Then read `docs/BUILD_STATE.md → Next Step` and do exactly that. Caution:
 older docs may contain obsolete instructions (e.g., building public
@@ -54,8 +60,8 @@ pnpm build` must pass before finishing a prompt
 
 Every future prompt/session MUST follow this lightweight process:
 
-1. **Read memory files first** (the 7 files listed above), then
-   `BUILD_STATE.md` and any feature docs relevant to the current prompt.
+1. **Read the Tier 0 context first** (see "Before Making Any Changes"),
+   then the Tier 1/2 files the current task needs (via `DOCS_INDEX.md`).
 2. **Inspect the current implementation** before changing anything.
 3. **Plan** against `BUILD_STATE.md → Next Step`; never rebuild completed
    work. Produce a concise plan and a TODO list before editing.
@@ -68,7 +74,7 @@ Every future prompt/session MUST follow this lightweight process:
 7. **Report the final status honestly** — distinguish what was BUILT in
    code from what was only DOCUMENTED or NOT built.
 8. Leave the repository in a state where the next agent can continue by
-   reading memory files alone.
+   reading the Tier 0 context alone.
 
 ## Escalation Path
 

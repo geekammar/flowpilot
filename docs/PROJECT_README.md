@@ -43,18 +43,24 @@ payments, CRM, marketplace, public API.
 
 ## Build status
 
-Prompts 01–03 complete: repository foundation (stack, tooling, auth wiring,
-env validation), design system + RTL + responsive shells + PWA, and the full
-database layer (schema, validation/DTOs, six repositories, Arabic seed).
-Nothing else exists yet — no feature screens beyond placeholders.
+Spec A core engine is implemented and verified prompt-by-prompt:
+foundation, design system/RTL/PWA, database layer, onboarding wizard,
+admin dashboard, conversations inbox, appointments agenda, and a full
+UX/A11y/PWA polish pass. The invitation foundation — data model, creation,
+acceptance, and ADMIN account activation — exists at the service layer
+(no UI yet). Remaining placeholders: customers, services, business
+settings/knowledge, team management, staff area. Ops passes (setup, health
+tooling, release, deployment, demo, distribution) are complete; releases
+v0.1.0–v0.4.0 are published.
 
 Authoritative ledger: `BUILD_STATE.md`.
 
 ## How to continue development
 
 1. Read `AGENT_RULES.md` — it is binding.
-2. Read the memory files listed there (vision → strategy → architecture →
-   spec → roadmap → decisions → build state).
+2. Load the Tier 0 context it defines (core context → build state →
+   decisions → agent rules), then only the docs your task needs via
+   `DOCS_INDEX.md`.
 3. Follow `CONTEXT_RECOVERY.md` to set up your environment.
 4. Implement exactly `BUILD_STATE.md → Next Step`.
 5. Verify (`pnpm lint && pnpm typecheck && pnpm format:check && pnpm build`),
