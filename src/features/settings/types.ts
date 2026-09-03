@@ -1,0 +1,20 @@
+/**
+ * Business Settings feature types (operator PROMPT-09).
+ */
+
+export type SettingsActionResult =
+  { success: true } | { success: false; message: string };
+
+/**
+ * Serializable settings view of the Business record for the settings
+ * screen — no ids of other tenants, no internal fields.
+ */
+export type BusinessSettingsView = {
+  name: string;
+  vertical: string;
+  city: string;
+  whatsappNumber: string;
+  timezone: string;
+  confirmationMode: string;
+  cancellationPolicy: string;
+};

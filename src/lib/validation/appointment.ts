@@ -34,6 +34,13 @@ const createAppointmentSchema = z
     startTime: timeSchema,
     endTime: timeSchema,
     notes: z.string().trim().max(2000).optional(),
+    /**
+     * Initial status (PROMPT-09): derived server-side from the Business's
+     * confirmation mode — PENDING (default/manual) or CONFIRMED
+     * (automatic). Omitted by callers; the repository spreads it into the
+     * create when present.
+     */
+    status: z.enum(appointmentStatusValues).optional(),
   })
   .refine((input) => input.endTime > input.startTime, {
     error: "وقت الانتهاء يجب أن يكون بعد وقت البداية",

@@ -31,6 +31,7 @@ export const APP_NAV_ITEMS: NavItem[] = [
   { href: "/conversations", label: "المحادثات", icon: "message" },
   { href: "/customers", label: "العملاء", icon: "users" },
   { href: "/services", label: "الخدمات", icon: "layers", roles: ["ADMIN"] },
+  { href: "/settings", label: "الإعدادات", icon: "settings", roles: ["ADMIN"] },
 ];
 
 /** Admin area navigation. */

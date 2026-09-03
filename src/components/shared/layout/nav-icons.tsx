@@ -6,6 +6,7 @@ import {
   House,
   Layers,
   MessageCircle,
+  SettingsIcon,
   Shield,
   Users,
   type LucideIcon,
@@ -19,6 +20,7 @@ const ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   clipboard: ClipboardList,
   layers: Layers,
+  settings: SettingsIcon,
 };
 
 export function getNavIcon(iconName: string): LucideIcon {

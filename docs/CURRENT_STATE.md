@@ -2,7 +2,7 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-08 (Services Management Foundation).
+> Last updated: 2026-09-03 — PROMPT-09 (Business Settings Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -18,9 +18,15 @@
   landed in PROMPT-08 (`/services`: list/create/edit/activate/
   deactivate, ADMIN-only, tenant-scoped, small create/edit dialog,
   active/inactive badges, empty/loading/error states — zero schema
-  changes). Remaining placeholders: customers, settings, team, staff
-  area (the `/sign-up` placeholder page remains in code but is no
-  longer a planned deliverable).
+  changes). Business Settings landed in PROMPT-09 (`/settings`:
+  بيانات المنشأة + إعدادات الحجز sections, one save action,
+  confirmation mode manual/automatic + cancellation policy, ADMIN-only,
+  tenant-scoped; `Business.confirmationMode` drives the server-derived
+  initial status of new appointments — one additive migration, authored
+  but not applied on-device). Remaining placeholders: customers,
+  business knowledge screen, team, staff area (the `/sign-up`
+  placeholder page remains in code but is no longer a planned
+  deliverable).
 - **Auth architecture alignment (Prompt 09) complete — documentation only:**
   invitation-first pilot account creation (Platform Operator provisions
   Business → invites ADMIN → activation → onboarding → ADMIN invites
@@ -88,6 +94,21 @@ Authentication & Authorization Model`.
   (ADMIN + tenant scoping on every operation; cross-Business ids
   rejected as not-found); inactive services stay excluded from booking
   selection paths. Vertical-agnostic; no pricing/packages/metadata.
+- **Business settings foundation (PROMPT-09): ✅ implemented:** the
+  `/settings` screen (ADMIN-only, STAFF redirected; Business always
+  derived from the session) with two sections — بيانات المنشأة (name,
+  vertical, city, WhatsApp number, timezone) and إعدادات الحجز
+  (confirmation mode manual/automatic + cancellation policy) — in one
+  form with one primary save action, prefilled values, inline Arabic
+  validation, and visible success/failure states. Authorization lives
+  in the settings service layer (ADMIN + tenant scoping on every read
+  and write; hostile businessId/role/isActive keys are Zod-stripped).
+  `Business.confirmationMode` (migration authored, not applied
+  on-device) drives the server-derived initial status of newly created
+  appointments (automatic → CONFIRMED, manual → PENDING). Follow-ups
+  documented (not built): default appointment duration (no clean
+  domain representation), working-hours editing in settings, account
+  activate/deactivate, knowledge screen.
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
@@ -126,13 +147,14 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   v0.6.0 — Onboarding UX Completion: published 2026-09-03 (PROMPT-07,
   via the documented GitHub publication workflow). v0.7.0 — Services
   Management Foundation: published 2026-09-03 (PROMPT-08, same
-  workflow) — every tag is pushed to origin and has a GitHub Release;
-  v0.7.0 is the current Latest. Local `main` and origin `main` are in
-  sync (see `PROJECT_STATUS.md → Release Status`). Open user action:
-  the repo is public but must be private (GITHUB_WORKFLOW.md /
-  DECISIONS #18).
+  workflow). v0.8.0 — Business Settings Foundation: published 2026-09-03
+  (PROMPT-09, same workflow) — every tag is pushed to origin and has a
+  GitHub Release; the newest tag is the current Latest. Local `main`
+  and origin `main` are in sync (see `PROJECT_STATUS.md → Release
+Status`). Open user action: the repo is public but must be private
+  (GITHUB_WORKFLOW.md / DECISIONS #18).
 - **Next step (product):** decided by the operator from the updated
-  BUILD_STATE — natural candidates: Customers Directory (Spec A §11,
-  the oldest remaining placeholder) or Business settings/knowledge
-  screens; then staff area → team.
+  BUILD_STATE — natural candidate: Customers Directory (Spec A §11,
+  the oldest remaining placeholder); then business knowledge screen →
+  staff area → team.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

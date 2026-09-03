@@ -36,6 +36,54 @@ export const VERTICALS: ReadonlyArray<{
 
 export const verticalSchema = z.enum(VERTICAL_VALUES, "اختر نوع المنشأة");
 
+/**
+ * Booking confirmation mode (PROMPT-09): how new appointments enter the
+ * agenda. Keys are stable machine identifiers; Arabic labels are for
+ * display only. Extending the list is a validation-layer change only
+ * (no migration, no Prisma enum).
+ */
+export const CONFIRMATION_MODE_VALUES = ["manual", "automatic"] as const;
+
+export type ConfirmationModeValue = (typeof CONFIRMATION_MODE_VALUES)[number];
+
+export const CONFIRMATION_MODE_LABELS: Record<ConfirmationModeValue, string> = {
+  manual: "تأكيد يدوي",
+  automatic: "تأكيد تلقائي",
+};
+
+export const CONFIRMATION_MODES: ReadonlyArray<{
+  value: ConfirmationModeValue;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "manual",
+    label: CONFIRMATION_MODE_LABELS.manual,
+    hint: "كل موعد جديد يضاف بانتظار التأكيد، وتؤكده أنت أو الفريق.",
+  },
+  {
+    value: "automatic",
+    label: CONFIRMATION_MODE_LABELS.automatic,
+    hint: "كل موعد جديد يُؤكد تلقائياً فور إنشائه.",
+  },
+];
+
+export const confirmationModeSchema = z.enum(
+  CONFIRMATION_MODE_VALUES,
+  "اختر طريقة تأكيد الحجز",
+);
+
+/**
+ * Supported timezones (promoted from the onboarding feature in PROMPT-09
+ * so the settings surface shares the same list; onboarding re-exports for
+ * backward compatibility within its own feature).
+ */
+export const TIMEZONES = [
+  { value: "Africa/Cairo", label: "القاهرة (توقيت مصر)" },
+  { value: "Asia/Riyadh", label: "الرياض" },
+  { value: "Asia/Dubai", label: "دبي" },
+] as const;
+
 const faqSchema = z.object({
   question: z.string().trim().min(2, "السؤال قصير جداً").max(500),
   answer: z.string().trim().min(2, "الإجابة قصيرة جداً").max(2000),
@@ -50,6 +98,7 @@ const createBusinessSchema = z.object({
   about: z.string().trim().max(2000).optional(),
   workingHours: workingHoursSchema.optional(),
   slotDurationMinutes: z.number().int().min(5).max(480).optional(),
+  confirmationMode: confirmationModeSchema.optional(),
   faqs: z.array(faqSchema).max(50).optional(),
   cancellationPolicy: z.string().trim().max(2000).optional(),
 });

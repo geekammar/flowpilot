@@ -9,6 +9,7 @@ import type { AppointmentActionResult } from "@/features/appointments/types";
 import { requireUser } from "@/server/auth/guards";
 import {
   appointmentRepository,
+  businessRepository,
   customerRepository,
   serviceRepository,
   userRepository,
@@ -67,6 +68,15 @@ export async function createAppointment(
 
   const endTime = addMinutes(parsed.data.startTime, service.durationMinutes);
   if (!endTime) return failure("الخدمة تتجاوز نهاية اليوم");
+
+  // Booking confirmation mode (PROMPT-09): server-derived from the
+  // Business record — never client input. "automatic" confirms new
+  // appointments on creation; "manual" (default) keeps them PENDING.
+  const business = await businessRepository.findById(user.businessId);
+  if (!business) return failure("لا يمكن الوصول إلى المنشأة");
+  const initialStatus =
+    business.confirmationMode === "automatic" ? "CONFIRMED" : "PENDING";
+
   try {
     const appointment = await appointmentRepository.createWithConflictCheck({
       businessId: user.businessId,
@@ -77,6 +87,7 @@ export async function createAppointment(
       startTime: parsed.data.startTime,
       endTime,
       notes: parsed.data.notes || undefined,
+      status: initialStatus,
     });
     if (!appointment) return failure("يوجد موعد آخر متداخل في هذا الوقت");
     refreshAppointments(appointment.id);

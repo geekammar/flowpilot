@@ -53,15 +53,22 @@ model Business {
   vertical           String?
   city               String?
   whatsappNumber     String
-   timezone           String    @default("Asia/Riyadh")
-   about              String?
-   /// JSON working-hours structure, e.g. { "sun": { "open": "09:00", "close": "21:00", "closed": false }, ... }
-   workingHours       Json?
-   slotDurationMinutes Int      @default(30) @map("slot_duration_minutes")
-   /// JSON FAQ entries: [{ "question": "...", "answer": "..." }]
-   faqs               Json?
-   cancellationPolicy String?
-   onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+  timezone           String    @default("Asia/Riyadh")
+  about              String?
+  /// JSON working-hours structure, e.g. { "sun": { "open": "09:00", "close": "21:00", "closed": false }, ... }
+  workingHours       Json?
+  slotDurationMinutes Int      @default(30) @map("slot_duration_minutes")
+  // Booking confirmation mode (operator PROMPT-09): how new appointments
+  // enter the agenda — "manual" (PENDING until the team confirms) or
+  // "automatic" (CONFIRMED on creation). Stable machine key validated by
+  // Zod (`CONFIRMATION_MODE_VALUES` in lib/validation) — no Prisma enum,
+  // extending the list needs no migration. Default preserves the
+  // pre-existing behavior (PENDING).
+  confirmationMode   String    @default("manual") @map("confirmation_mode")
+  /// JSON FAQ entries: [{ "question": "...", "answer": "..." }]
+  faqs               Json?
+  cancellationPolicy String?
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
   isActive           Boolean   @default(true)
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")

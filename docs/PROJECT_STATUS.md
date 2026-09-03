@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-08 —
-> Services Management Foundation).
+> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-09 —
+> Business Settings Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -30,8 +30,9 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | ADMIN account activation (Better Auth + membership)          | ✅ complete (PROMPT-05, service layer) |
 | Activation → onboarding integration                          | ✅ complete (PROMPT-06)                |
 | Services management (PROMPT-08)                              | ✅ complete                            |
+| Business settings — identity + booking behavior (PROMPT-09)  | ✅ complete                            |
 | Customers directory                                          | ⏳ placeholder (oldest remaining)      |
-| Business settings / knowledge screens                        | ⏳ placeholder                         |
+| Business knowledge screen                                    | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
 | Staff area                                                   | ⏳ placeholder                         |
 
@@ -64,7 +65,20 @@ Business always derived from the session, a small shared create/edit
 dialog, active/inactive canonical statuses, empty/loading/error
 states, and role-scoped navigation — zero schema changes (the existing
 Service model/repository/validation were sufficient; inactive services
-remain excluded from booking selection paths). Not yet implemented:
+remain excluded from booking selection paths). Business Settings is
+now implemented (PROMPT-09): `/settings` with بيانات المنشأة (name,
+vertical, city, WhatsApp, timezone) and إعدادات الحجز (confirmation
+mode + cancellation policy) in one form with one save action, inline
+Arabic validation, visible success/failure states, ADMIN-only +
+tenant-scoped in the settings service layer, the Business always
+derived from the session, and role-scoped navigation. One additive
+field `Business.confirmationMode` (manual/automatic, default manual;
+migration authored, not applied on-device) drives the server-derived
+initial status of new appointments. Not yet implemented: default
+appointment duration (no clean domain representation — documented,
+not invented), working-hours editing in settings, account
+activate/deactivate, and the knowledge screen.
+Not yet implemented:
 token delivery, invitation creation UI (Team management), and the
 STAFF activation workflow.
 
@@ -173,7 +187,7 @@ activation`); the tag is pushed to origin and the GitHub Release
   `DATABASE_URL` (device-local, user action) and was not used, per the
   operator's instruction.
 - **v0.7.0 — Services Management Foundation: PUBLISHED** (2026-09-03,
-  PROMPT-08 — current Latest release). Annotated tag `v0.7.0` points at
+  PROMPT-08). Annotated tag `v0.7.0` points at
   the PROMPT-08 commit (`feat(services): add services management
 foundation`); the tag is pushed to origin and the GitHub Release
   "FlowPilot v0.7.0 — Services Management Foundation" exists. Published
@@ -181,6 +195,16 @@ foundation`); the tag is pushed to origin and the GitHub Release
   pattern); the legacy `pnpm release` doctor gate still blocks on this
   device's placeholder `DATABASE_URL` (device-local, user action) and
   was not used, per the operator's instruction.
+- **v0.8.0 — Business Settings Foundation: PUBLISHED** (2026-09-03,
+  PROMPT-09 — current Latest release). Annotated tag `v0.8.0` points
+  at the PROMPT-09 commit (`feat(settings): add business settings
+foundation`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.8.0 — Business Settings Foundation" exists. Published
+  through the documented GitHub publication workflow
+  (PROMPT-05A..08 pattern); the legacy `pnpm release` doctor gate
+  still blocks on this device's placeholder `DATABASE_URL`
+  (device-local, user action) and was not used, per the operator's
+  instruction.
 - Publication history was reconciled by PROMPT-05A (operations-only):
   local `main` was already current on origin (no commit push needed);
   the three missing tags were pushed normally (no force) and the

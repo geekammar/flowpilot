@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-08 (Services Management Foundation).
+> Last updated: PROMPT-09 (Business Settings Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -2148,7 +2148,183 @@ service-service.ts,actions/service-actions.ts,components/
 
 ---
 
-## Current State Summary
+## PROMPT-09 — Business Settings Foundation
+
+**Status:** ✅ Complete
+
+> Operator prompt: BUSINESS SETTINGS FOUNDATION. The first real Business
+> Settings surface at `/settings` — two small sections (بيانات المنشأة /
+> إعدادات الحجز) answering "كيف تعمل المنشأة؟". Arabic-first, RTL,
+> mobile-first, ADMIN-only, tenant-scoped. One additive schema field
+> (`Business.confirmationMode`) because booking confirmation mode had NO
+> safe domain representation yet has an immediate operational consumer
+> (initial status of new appointments). Default `manual` preserves the
+> pre-existing behavior exactly.
+
+### ALREADY IMPLEMENTED (reused, untouched in spirit)
+
+- Business identity fields (name, vertical — discovery metadata,
+  PROMPT-07, city, WhatsApp number, timezone) and booking fields
+  (cancellationPolicy, slotDurationMinutes) — all pre-existing on the
+  Business record
+- `BusinessRepository` (`findById`, `update`) — used as-is
+- Guards (`requireRole("ADMIN")`), services-feature workflow pattern
+  (service layer with actor + tenant scoping, injectable repositories,
+  thin `"use server"` action)
+- AppShell role-scoped navigation (`roles: ["ADMIN"]`), design-system
+  primitives (PageHeader, SectionHeader, Input/Select/Textarea/Label,
+  RadioGroup — added via `shadcn add radio-group`, the established
+  primitive pipeline)
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **`Business.confirmationMode`** — the only schema change: NOT NULL
+  TEXT default `'manual'` + migration
+  `20260903140000_business_confirmation_mode` (SQL authored on-device
+  in Prisma's migration style — the schema engine cannot execute on
+  Termux; apply from desktop/CI with `pnpm db:deploy`). Stable machine
+  keys `manual` / `automatic` validated by a Zod union
+  (`CONFIRMATION_MODE_VALUES` in `src/lib/validation/business.ts`) —
+  no Prisma enum, so extending needs no migration.
+- **`/settings` screen** (`(app)/settings/{page,loading}.tsx` +
+  `SettingsScreen`): ADMIN-only page guard (`requireRole("ADMIN")` →
+  STAFF redirected to `/access-denied`; no business → `/onboarding`),
+  session-derived Business, two clearly separated sections in ONE form
+  with ONE primary save action (بيانات المنشأة: name/vertical/city/
+  WhatsApp/timezone; إعدادات الحجز: confirmation mode + cancellation
+  policy), prefilled current values, RHF + Zod inline Arabic validation,
+  visible success (`role="status"`, تم حفظ الإعدادات) and failure
+  (`role="alert"`) states, submitting spinner, layout-matched loading
+  skeleton, radio-cards for the confirmation mode with plain-Arabic
+  hints, logical CSS properties only.
+- **Settings workflow** (`src/features/settings/server/
+settings-service.ts`): `getBusinessSettings` / `updateBusinessSettings`
+  with the authorization rules inside — ADMIN-only, target Business
+  ALWAYS the actor's own (derived from the trusted session → user
+  record; client input carries no businessId/role/account keys and Zod
+  strips all unknown keys), typed Arabic failures without internals.
+  Repository collaborators injectable (established pattern).
+- **Thin server action** (`settings-actions.ts`): builds the actor from
+  the authenticated session + DB user (least-privilege STAFF if the
+  user record vanished), runs the update, revalidates `/settings`, `/`,
+  `/appointments`.
+- **Booking behavior wiring**: `createAppointment` now derives the
+  initial appointment status server-side from the Business's
+  confirmation mode — `automatic` → `CONFIRMED`, `manual`/default →
+  `PENDING` (never client input). `CreateAppointmentDto` gained an
+  optional `status` (Zod-enum) that the repository spreads into the
+  create; callers other than the derivation pass nothing (legacy shape
+  unchanged and verified).
+- **Shared validation growth**: `CONFIRMATION_MODE_VALUES/LABELS/
+CONFIRMATION_MODES`, `confirmationModeSchema`, and `TIMEZONES`
+  promoted from the onboarding feature to `@/lib/validation/business`
+  (two features need the same list — documented promotion rule);
+  onboarding re-exports TIMEZONES for continuity (verified unchanged).
+- **Navigation**: `الإعدادات` added to APP_NAV_ITEMS with
+  `roles: ["ADMIN"]` + `SettingsIcon` — desktop sidebar and mobile
+  bottom nav render it for ADMINs only; server guards remain the
+  authorization boundary. Bottom-nav capacity: 4 items for ADMIN
+  (الرئيسية/المواعيد/المحادثات/العملاء + الخدمات + الإعدادات render
+  in the grid flow-col pattern — same as the existing 5-item state,
+  verified ≤6 items at 360px by the existing auto-cols-fr layout).
+
+### NOT IMPLEMENTED (documented follow-ups — not silently invented)
+
+- **Default appointment duration**: the domain stores per-service
+  durations (`Service.durationMinutes`) and slot granularity
+  (`Business.slotDurationMinutes`) — neither is "default appointment
+  duration"; per the operator's "only if the existing model supports it
+  cleanly" rule this is documented, NOT built.
+- Working-hours editing in settings (onboarding step 2 owns the wizard
+  flow; a settings surface for hours is a follow-up slice).
+- Business account activate/deactivate (Spec A §3 — separate action
+  with its own guardrails).
+- Business knowledge/FAQs screen (`/settings/knowledge`, Spec A §6).
+- Automatic confirmation for WhatsApp/AI-created appointments (the AI
+  booking agent is a later Spec A slice; today the setting affects the
+  existing Create Appointment path).
+
+### Generated / Changed Files
+
+`prisma/migrations/20260903140000_business_confirmation_mode/
+migration.sql`; `src/features/settings/{README.md,types.ts,schemas/
+settings-schema.ts,server/settings-service.ts,actions/settings-actions.ts,
+components/settings-screen.tsx}`; `src/app/(app)/settings/{page,loading}.tsx`;
+`src/components/ui/radio-group.tsx` (shadcn-generated primitive); updated
+`prisma/schema.prisma` (confirmationMode), `src/lib/validation/business.ts`
+(confirmation-mode constants + TIMEZONES promotion), `src/lib/validation/
+appointment.ts` (optional create status), `src/features/appointments/actions/
+appointment-actions.ts` (server-derived initial status), `src/features/
+onboarding/schemas/onboarding-schema.ts` (TIMEZONES re-export),
+`src/lib/app-config.ts` + `src/components/shared/layout/nav-icons.tsx`
+(ADMIN-scoped nav), `package.json` (version → 0.8.0).
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..08 pattern): **63/63 checks passed** offline with in-memory
+  repository stand-ins running the REAL service + schemas, plus
+  source-level checks — the 10 required categories: (1) ADMIN read
+  returns own-business view; (2) ADMIN update persists name/mode/policy
+  through the repository path; (3) STAFF read+write denied with the
+  Arabic FORBIDDEN message and ZERO repository writes; (4) cross-business
+  read fails gracefully, hostile payload with another tenant's
+  businessId/role/isActive still writes ONLY the actor's business and
+  the override keys never reach the update, other business untouched;
+  (5) client businessId never redirects the write target; (6) invalid
+  business data rejected (short name, unknown vertical, short city, bad
+  phone, unknown timezone) with Arabic messages; (7) invalid booking
+  settings rejected (unknown confirmation mode, empty/short policy,
+  missing mode) with Arabic messages, `automatic` accepted; (8) exact
+  field set persisted + read-back reflects it; (9) Arabic error states
+  incl. no-business and empty-input, constants sanity
+  (manual/automatic, TIMEZONES, VERTICALS unchanged); (10) no
+  regressions — onboarding businessSetupSchema still valid, TIMEZONES
+  re-export works, appointment create DTO accepts the legacy no-status
+  shape AND the derived-status shape, invalid statuses rejected.
+  Plus: persistence-failure typed without internals; source checks —
+  page guarded by `requireRole("ADMIN")`, action is a thin use-server
+  wrapper, feature schema exposes no businessId key, one submit button,
+  success `role="status"` / failure `role="alert"`, no physical
+  left/right CSS, appointment status derived from
+  `business.confirmationMode`.
+- `pnpm db:generate` ✅ · `pnpm typecheck` ✅ · `pnpm lint` ✅ ·
+  `pnpm format:check` ✅
+- `pnpm verify` full gate: PASSED ✅ (lint 46.1s · typecheck 22.7s ·
+  format 40.3s · build --webpack 288.2s) — `/settings` compiled as a
+  dynamic route
+- `pnpm security` ✅
+- NOT verified on-device (environment limits, honestly stated):
+  live-database behavior (placeholder `DATABASE_URL`; the workflow runs
+  against injectable repositories; the real-DB path is the existing
+  `BusinessRepository.update` already used by onboarding). Migration
+  `20260903140000_business_confirmation_mode` is authored but NOT
+  applied on-device — apply from desktop/CI: `pnpm db:deploy`.
+
+### Known Limitations
+
+- The confirmation-mode setting affects the existing Create Appointment
+  path today; the AI/WhatsApp booking agent (a later Spec A slice) will
+  consume the same setting when it lands.
+- Settings edits are explicit-save (no autosave) — deliberate: settings
+  are low-frequency, high-consequence; the wizard keeps its autosave.
+- The timezone list remains the 3-value curated list (Cairo/Riyadh/
+  Dubai) shared with onboarding; extending it is a shared-validation
+  change only.
+
+### Release
+
+- Commit `feat(settings): add business settings foundation`;
+  `package.json` version bumped to 0.8.0 (MINOR — new user-facing
+  product capability; `/api/health` reports the version).
+- Annotated tag `v0.8.0` — Business Settings Foundation — points at
+  the PROMPT-09 commit. Published through the documented GitHub
+  publication workflow (PROMPT-05A..08 pattern); the legacy
+  `pnpm release` doctor gate still blocks on this device's placeholder
+  `DATABASE_URL` (device-local, user action) and was not used, per the
+  operator's prompt instruction.
+
+---
 
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
   to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
@@ -2156,17 +2332,20 @@ service-service.ts,actions/service-actions.ts,components/
   capture, smart resume, step guards, and a real review step; services/
   knowledge deferred to their own screens), owner dashboard,
   Conversations, Appointments, a full polish pass (loading/error/
-  empty states, a11y, PWA PNG icons, demo-ready seed), and Services
+  empty states, a11y, PWA PNG icons, demo-ready seed), Services
   management (PROMPT-08: list/create/edit/activate/deactivate,
-  ADMIN-only, tenant-scoped, zero schema changes) are complete. Still
-  placeholders: Customers directory, Business settings/knowledge
-  screens, Team management (admin), and the Staff area. (The
-  `/sign-up` placeholder page remains in code but is no longer a
-  planned deliverable — superseded by the invitation-first model; the
-  invitation foundation, acceptance, ADMIN account activation, and the
-  ADMIN activation UI → onboarding handoff now exist, but invitation
-  creation UI / team management and token delivery are still to be
-  built.)
+  ADMIN-only, tenant-scoped, zero schema changes), and Business
+  Settings (PROMPT-09: `/settings` with identity + booking-behavior
+  sections, ADMIN-only, tenant-scoped, one additive field
+  `Business.confirmationMode` driving the initial status of new
+  appointments) are complete. Still placeholders: Customers directory,
+  Business knowledge screen, Team management (admin), and the Staff
+  area. (The `/sign-up` placeholder page remains in code but is no
+  longer a planned deliverable — superseded by the invitation-first
+  model; the invitation foundation, acceptance, ADMIN account
+  activation, and the ADMIN activation UI → onboarding handoff now
+  exist, but invitation creation UI / team management and token
+  delivery are still to be built.)
 - **Ops 01 (DX pass) complete:** cross-platform bootstrap/dev scripts,
   `pnpm run setup` / `pnpm run doctor` / `pnpm verify`, safe `.env.local`
   automation, unified env precedence, per-OS setup docs — see
@@ -2270,10 +2449,23 @@ password}` input and typed Arabic error mapping, safe sign-in →
   enforced in the service layer, session-derived Business on every
   operation, and role-scoped navigation. Zero schema changes — the
   existing Service model/repository/validation were sufficient.
+- **Business settings foundation (PROMPT-09) complete:** `/settings`
+  screen with two sections (بيانات المنشأة: name/vertical/city/
+  WhatsApp/timezone; إعدادات الحجز: confirmation mode + cancellation
+  policy), one primary save action, inline Arabic validation, visible
+  success/failure states, ADMIN-only with tenant scoping enforced in
+  the settings service layer, session-derived Business on every
+  operation, role-scoped navigation, and `Business.confirmationMode`
+  (manual/automatic, default manual) driving the server-derived initial
+  status of new appointments. One additive migration
+  (`20260903140000`, authored, not applied on-device). Follow-ups
+  documented: default appointment duration (no clean domain
+  representation — not invented), working-hours editing in settings,
+  account activate/deactivate, knowledge screen.
 - **Next Step:** the next product prompt is decided by the operator from
-  this updated state. Natural Spec A candidates: **Customers Directory**
-  (Spec A §11 — now the oldest remaining placeholder) and **Business
-  settings/knowledge screens**. Do NOT combine unrelated areas. Then
-  staff area → team (team includes the STAFF invitation/activation UX
-  composing the existing invitation services).
+  this updated state. Natural Spec A candidate: **Customers Directory**
+  (Spec A §11 — the oldest remaining placeholder). Then business
+  knowledge screen → staff area → team (team includes the STAFF
+  invitation/activation UX composing the existing invitation services).
+  Do NOT combine unrelated areas.
 - After each prompt: update this file and `DECISIONS.md`.

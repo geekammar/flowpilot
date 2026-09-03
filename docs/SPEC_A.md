@@ -51,6 +51,13 @@ collect evidence.
 
 - View/edit business profile and working hours
 - Activate/deactivate business account
+- **Implemented (PROMPT-09):** `/settings` — business identity (name,
+  vertical, city, WhatsApp number, timezone) and booking behavior
+  (confirmation mode manual/automatic + cancellation policy),
+  ADMIN-only, tenant-scoped. Working-hours editing, account
+  activate/deactivate, and the knowledge screen remain follow-up
+  slices. The confirmation mode drives the server-derived initial
+  status of new appointments.
 
 ### 4. Services
 
@@ -134,7 +141,7 @@ collect evidence.
 | `(app)`     | `/customers`          | Customer directory                                                                                                         |
 | `(app)`     | `/customers/[id]`     | Customer profile/history                                                                                                   |
 | `(app)`     | `/services`           | Service catalog management                                                                                                 |
-| `(app)`     | `/settings/business`  | Business setup                                                                                                             |
+| `(app)`     | `/settings`           | Business settings (PROMPT-09): identity + booking behavior                                                                 |
 | `(app)`     | `/settings/knowledge` | Business knowledge entries                                                                                                 |
 | `(admin)`   | `/admin`              | Admin area shell (team mgmt entry)                                                                                         |
 | `(admin)`   | `/admin/team`         | Team management                                                                                                            |

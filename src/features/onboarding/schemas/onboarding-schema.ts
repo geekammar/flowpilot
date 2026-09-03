@@ -17,11 +17,9 @@ export const DAYS = [
   { key: "fri", label: "الجمعة" },
 ] as const;
 
-export const TIMEZONES = [
-  { value: "Africa/Cairo", label: "القاهرة (توقيت مصر)" },
-  { value: "Asia/Riyadh", label: "الرياض" },
-  { value: "Asia/Dubai", label: "دبي" },
-] as const;
+// Promoted to the shared validation layer in PROMPT-09 (the settings
+// surface needs the same list); re-exported here for feature continuity.
+export { TIMEZONES } from "@/lib/validation";
 
 /** Step 1 — بيانات المنشأة (about is optional; null from the DB is allowed). */
 export const businessSetupSchema = z.object({
