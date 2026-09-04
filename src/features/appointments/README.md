@@ -51,7 +51,9 @@ creation).
 - `server/booking-flow-service.ts` — Steps 1–2 reads: tenant-scoped
   customer search (name/phone via the existing repository primitive) and
   the active-services list.
-- `hooks/use-debounced-value.ts` — debounce for the search box.
+- `hooks/use-debounced-value.ts` — debounce for the search box
+  (promoted to `src/hooks/use-debounced-value.ts` in PROMPT-15 — the
+  customers feature needed the same hook).
 - `components/smart-create/*` — the Smart Create flow (see below).
 - `types.ts` — agenda/detail/option types, the availability result
   contract, the 6-step flow constants, `SelectedSlot`, the review-check

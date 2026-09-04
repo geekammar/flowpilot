@@ -155,7 +155,7 @@ export class AppointmentRepository {
     return { agenda, pendingCount, confirmedCount };
   }
 
-  async listRecentByCustomer(businessId: string, customerId: string) {
+  async listRecentByCustomer(businessId: string, customerId: string, take = 3) {
     return db.appointment.findMany({
       where: { businessId, customerId, ...notDeleted },
       include: {
@@ -165,7 +165,7 @@ export class AppointmentRepository {
         },
       },
       orderBy: [{ date: "desc" }, { startTime: "desc" }],
-      take: 3,
+      take,
     });
   }
 

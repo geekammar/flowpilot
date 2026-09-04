@@ -88,6 +88,16 @@ export class ConversationRepository {
     });
   }
 
+  /** Customer-history view — lightweight rows for one customer's threads. */
+  async listByCustomer(businessId: string, customerId: string) {
+    return db.conversation.findMany({
+      where: { businessId, customerId, ...notDeleted },
+      select: { id: true, status: true, lastMessageAt: true, createdAt: true },
+      orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
+      take: 50,
+    });
+  }
+
   async getDashboardSummary(
     businessId: string,
     dayStartUtc: Date,

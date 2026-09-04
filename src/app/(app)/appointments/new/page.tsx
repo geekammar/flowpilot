@@ -6,6 +6,7 @@ import {
   searchBookingCustomers,
   type BookingFlowActor,
 } from "@/features/appointments/server/booking-flow-service";
+import { CustomerFormDialog } from "@/features/customers/components/customer-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { appointmentDateSchema } from "@/lib/validation";
 import { requireUser } from "@/server/auth/guards";
@@ -25,7 +26,9 @@ export const metadata: Metadata = {
  * initial customers + active services are read through the
  * booking-flow service (tenant-scoped), `today` is business-local,
  * and the Business timezone / confirmation mode travel to Step 6 as
- * server-derived display properties.
+ * server-derived display properties. The route composes the
+ * customers feature's create dialog into Step 1 (PROMPT-15) so a
+ * customer can be created when no existing one is available.
  */
 export default async function NewAppointmentPage({
   searchParams,
@@ -75,6 +78,7 @@ export default async function NewAppointmentPage({
           confirmationMode={
             business.confirmationMode === "automatic" ? "automatic" : "manual"
           }
+          CustomerCreateDialog={CustomerFormDialog}
         />
       </div>
     </div>

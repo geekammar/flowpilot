@@ -4,7 +4,10 @@ import { createAppointment } from "@/features/appointments/actions/appointment-a
 import { getAvailabilityAction } from "@/features/appointments/actions/availability-actions";
 import { BookingFlowProgress } from "@/features/appointments/components/smart-create/booking-flow-progress";
 import { ConfirmStep } from "@/features/appointments/components/smart-create/confirm-step";
-import { CustomerStep } from "@/features/appointments/components/smart-create/customer-step";
+import {
+  CustomerStep,
+  type CustomerCreateDialogComponent,
+} from "@/features/appointments/components/smart-create/customer-step";
 import { DateStep } from "@/features/appointments/components/smart-create/date-step";
 import {
   ReviewStep,
@@ -90,6 +93,7 @@ export function SmartCreateAppointment({
   canManageServices,
   businessTimezone,
   confirmationMode,
+  CustomerCreateDialog,
 }: {
   initialCustomers: BookingCustomerOption[];
   services: BookingServiceOption[];
@@ -102,6 +106,13 @@ export function SmartCreateAppointment({
   /** Business booking setting (server-derived) — drives the
    * post-confirmation behavior copy. */
   confirmationMode: "automatic" | "manual";
+  /**
+   * Optional create-customer dialog (PROMPT-15): composed at the
+   * route layer from the customers feature so Step 1 can create a
+   * customer when no existing one is available. Absent → Step 1
+   * behaves exactly as before.
+   */
+  CustomerCreateDialog?: CustomerCreateDialogComponent;
 }) {
   const [screen, setScreen] = useState<BookingFlowScreen>("customer");
   const [customer, setCustomer] = useState<BookingCustomerOption | null>(null);
@@ -394,6 +405,7 @@ export function SmartCreateAppointment({
             initialCustomers={initialCustomers}
             selected={customer}
             onSelect={setCustomer}
+            CreateCustomerDialog={CustomerCreateDialog}
           />
         ) : screen === "service" ? (
           <ServiceStep

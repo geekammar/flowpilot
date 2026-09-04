@@ -1,12 +1,12 @@
 "use client";
 
 import { searchBookingCustomersAction } from "@/features/appointments/actions/booking-flow-actions";
-import { useDebouncedValue } from "@/features/appointments/hooks/use-debounced-value";
 import type { BookingCustomerOption } from "@/features/appointments/types";
 import { EmptyState } from "@/components/shared/empty-state";
 import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { SEARCH_RESULT_NOUNS, arabicCount } from "@/lib/arabic";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ import {
   CheckCircle2Icon,
   MessageCircleIcon,
   UserRoundIcon,
+  UserRoundPlusIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -23,20 +24,37 @@ import { useState } from "react";
  * Step 1 — العميل. Focused customer selection: search by name or phone
  * (debounced, tenant-scoped server action), a clear empty state when
  * nothing matches, and an obvious selected-customer state that is easy
- * to change before continuing.
+ * to change before continuing. When no existing customer is available,
+ * the route-composed create-customer dialog (customers feature) lets
+ * the user add one without leaving the flow (PROMPT-15).
  */
+export type CustomerCreateDialogComponent = React.ComponentType<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (customer: BookingCustomerOption) => void;
+}>;
+
 export function CustomerStep({
   initialCustomers,
   selected,
   onSelect,
+  CreateCustomerDialog,
 }: {
   /** Most recent customers, preloaded by the page (empty query). */
   initialCustomers: BookingCustomerOption[];
   selected: BookingCustomerOption | null;
   onSelect: (customer: BookingCustomerOption) => void;
+  /**
+   * Optional create-customer dialog (composed at the route layer from
+   * the customers feature — feature isolation is preserved). Present
+   * → the empty states offer "إضافة عميل جديد" and a created
+   * customer is selected immediately so the flow continues unchanged.
+   */
+  CreateCustomerDialog?: CustomerCreateDialogComponent;
 }) {
   const [searching, setSearching] = useState(!selected);
   const [query, setQuery] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
   const debouncedQuery = useDebouncedValue(query);
 
   const search = useQuery({
@@ -123,21 +141,48 @@ export function CustomerStep({
             <EmptyState
               icon={UserRoundIcon}
               title="لا يوجد عملاء بعد"
-              description="يُضاف العملاء تلقائياً من محادثات واتساب — افتح المحادثات لبدء التواصل."
+              description={
+                CreateCustomerDialog
+                  ? "أضف عميلاً يدوياً لتحجز له موعداً، أو افتح المحادثات لبدء التواصل."
+                  : "يُضاف العملاء تلقائياً من محادثات واتساب — افتح المحادثات لبدء التواصل."
+              }
               action={
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/conversations">
-                    <MessageCircleIcon aria-hidden className="size-4" />
-                    فتح المحادثات
-                  </Link>
-                </Button>
+                CreateCustomerDialog ? (
+                  <Button size="sm" onClick={() => setCreateOpen(true)}>
+                    <UserRoundPlusIcon aria-hidden className="size-4" />
+                    إضافة عميل جديد
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/conversations">
+                      <MessageCircleIcon aria-hidden className="size-4" />
+                      فتح المحادثات
+                    </Link>
+                  </Button>
+                )
               }
             />
           ) : (
             <EmptyState
               icon={UserRoundIcon}
               title="لا توجد نتائج مطابقة"
-              description="جرّب البحث بجزء من الاسم أو برقم الهاتف."
+              description={
+                CreateCustomerDialog
+                  ? "جرّب البحث بجزء من الاسم أو رقم الهاتف، أو أضفه كعميل جديد."
+                  : "جرّب البحث بجزء من الاسم أو برقم الهاتف."
+              }
+              action={
+                CreateCustomerDialog ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <UserRoundPlusIcon aria-hidden className="size-4" />
+                    إضافة عميل جديد
+                  </Button>
+                ) : undefined
+              }
             />
           )
         ) : (
@@ -194,6 +239,19 @@ export function CustomerStep({
             </ul>
           </>
         )
+      ) : null}
+
+      {CreateCustomerDialog ? (
+        <CreateCustomerDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(customer) => {
+            // A server-confirmed creation selects the customer right
+            // away — the flow continues exactly as with a search pick.
+            onSelect(customer);
+            setSearching(false);
+          }}
+        />
       ) : null}
     </div>
   );
