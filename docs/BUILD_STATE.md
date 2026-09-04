@@ -6,7 +6,8 @@
 > completed work, known issues, next step — not a historical diary.
 > Historical implementation detail lives in Git history (`git log --oneline`,
 > `git show <commit>`, release tags) and `DECISIONS.md`.
-> Last updated: PROMPT-13.5 (documentation reset). Product version: **v0.12.0**.
+> Last updated: PROMPT-13.6 (decision-context optimization; docs only).
+> Product version: **v0.12.0**.
 
 ## Current State (summary)
 
@@ -116,6 +117,36 @@ on-device (Termux schema-engine limitation — apply from desktop/CI with
 2. Set a real `DATABASE_URL` in `.env.local` on this device (doctor gate).
 3. For deployment: Vercel env vars (Production + Preview) + `pnpm db:deploy`
    against Neon from desktop/CI (`VERCEL_DEPLOYMENT.md`).
+
+## PROMPT-13.6 — Decision Context Optimization (docs only)
+
+- **Objective:** reduce the mandatory Tier-0 context cost of the ~72 KB
+  `DECISIONS.md` without losing any decision history.
+- **Changes:** added `DECISIONS_INDEX.md` (compact derived index of all 25
+  decisions, grouped by area; explicitly non-authoritative); moved the full
+  `DECISIONS.md` from Tier 0 to Tier 1/conditional; updated the
+  `DOCS_INDEX.md` + `AGENT_RULES.md` reading policy to match.
+- **Files changed:** `docs/DECISIONS_INDEX.md` (new), `docs/DOCS_INDEX.md`,
+  `docs/AGENT_RULES.md`, `docs/BUILD_STATE.md`. `DECISIONS.md` untouched
+  (71,725 B, byte-identical).
+- **Context model now:** Tier 0 = CORE_CONTEXT, BUILD_STATE, AGENT_RULES,
+  DOCS_INDEX, DECISIONS_INDEX; Tier 1 = task-relevant canonical docs,
+  including the full `DECISIONS.md` when a task touches a decision or needs
+  authoritative historical detail; Tier 2 = operational docs; historical =
+  Git only. `DECISIONS.md` remains append-only and authoritative; derived
+  summaries never override it.
+- **Measured:** Tier 0 before 98,022 B → after 34,523 B (−63,499 B, −64.8%);
+  `DECISIONS_INDEX.md` = 5,019 B; total docs/ 246,402 B → 254,628 B.
+- **Verification:** all 25 indexed decision numbers exist in `DECISIONS.md`
+  (none invented, none omitted, no renumbering, no meaning change); no stale
+  "DECISIONS.md is Tier 0 / always load" statements remain; prettier check
+  green on changed files; no source/schema/migration/env changes.
+- **Known quirk (preserved):** `DECISIONS.md` row #15 has an empty Status
+  cell (pre-existing formatting; left untouched per the append-only rule).
+- **Git:** one commit `docs(context): optimize decision context loading`,
+  pushed to origin/main. No tag, no release.
+- **No product feature changed.** Exact next product step: PROMPT-14 —
+  Smart Create Appointment Step 6 (see below).
 
 ## Next Step (product)
 

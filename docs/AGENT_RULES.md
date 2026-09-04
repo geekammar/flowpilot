@@ -3,7 +3,8 @@
 > Binding rules for every AI agent (and human contributor) working on
 > FlowPilot. Ignorance of these rules is not an excuse; they exist so that any
 > agent can continue the project safely after all context is lost.
-> Last updated: PROMPT-13.5 (tiered doc-loading model, minimal-ledger rule).
+> Last updated: PROMPT-13.6 (decision-context split: DECISIONS_INDEX Tier 0,
+> full DECISIONS conditional).
 
 ## Before Making Any Changes
 
@@ -13,16 +14,21 @@ Load the Tier 0 context (always, in order — navigation map:
 1. `docs/CORE_CONTEXT.md` — compact orientation (derived; canonical files
    always override it)
 2. `docs/BUILD_STATE.md` — the ONE current-state document + next step
-3. `docs/DECISIONS.md` — accepted decisions (binding, append-only)
+3. `docs/DECISIONS_INDEX.md` — compact decision index (derived from
+   `DECISIONS.md`; never authoritative)
 4. `docs/AGENT_RULES.md` — this file
 
 Then load Tier 1 files ONLY when the task touches their topic, and Tier 2
 files ONLY for operational tasks, selected via `docs/DOCS_INDEX.md`
 (e.g., product work → `SPEC_A.md`; any code → `ARCHITECTURE.md`; DB work →
 `DATABASE.md`; UI work → `UX.md`; deployment → `VERCEL_DEPLOYMENT.md`).
-Never skip `BUILD_STATE.md` or `DECISIONS.md`; never treat
-`CORE_CONTEXT.md` or `DOCS_INDEX.md` as authoritative; do not read
-historical prompt reports automatically — they live in Git history only.
+Never skip `BUILD_STATE.md` or `DECISIONS_INDEX.md`; never treat
+`CORE_CONTEXT.md`, `DOCS_INDEX.md`, or `DECISIONS_INDEX.md` as
+authoritative; do not read historical prompt reports automatically — they
+live in Git history only. Open the full `docs/DECISIONS.md` ONLY when the
+current task touches a decision, the index is insufficient, a conflict must
+be investigated, or authoritative historical detail is required — it
+remains the append-only, authoritative decision record.
 
 Then read `docs/BUILD_STATE.md → Next Step` and do exactly that. Caution:
 older wording anywhere may be obsolete; `DECISIONS.md` and `BUILD_STATE.md`
@@ -39,6 +45,10 @@ guessing.
   stores, new ORMs, extra API layers, new UI frameworks
 - ❌ Add infrastructure not approved in `ARCHITECTURE.md` (Vercel + Neon only)
 - ❌ Modify or delete historical entries in `DECISIONS.md`
+- ❌ Treat `DECISIONS_INDEX.md` as authoritative, or alter historical
+  decision meaning in `DECISIONS.md` to optimize context size (the index is
+  a derived navigation aid; `DECISIONS.md` stays append-only and
+  authoritative)
 - ❌ Redo or reimplement completed work recorded in `BUILD_STATE.md`
   ("if it works, leave it")
 - ❌ Break RTL/Arabic-first behavior or accessibility guarantees
