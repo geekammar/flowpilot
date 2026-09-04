@@ -6,14 +6,14 @@
 > completed work, known issues, next step — not a historical diary.
 > Historical implementation detail lives in Git history (`git log --oneline`,
 > `git show <commit>`, release tags) and `DECISIONS.md`.
-> Last updated: PROMPT-17 (Staff Area / Human Handoff UX).
-> Product version: **v0.13.2** (pre-ship; operator bumps via `pnpm ship`).
+> Last updated: PROMPT-18 (Business Knowledge screen).
+> Product version: **v0.15.0** (pre-ship; operator bumps via `pnpm ship`).
 
 ## Current State (summary)
 
 **Spec A — Discovery Foundation + Booking Core** (frozen scope: `SPEC_A.md`)
-is implemented and verified prompt-by-prompt through the staff workspace.
-Complete: the booking core (dashboard, conversations inbox + detail,
+is implemented and verified prompt-by-prompt through the business knowledge
+screen. Complete: the booking core (dashboard, conversations inbox + detail,
 appointments agenda/detail, services, settings, deterministic availability,
 Smart Create steps 1–6 — review hands off to التأكيد, which creates the
 appointment through the canonical `createAppointment` write path), the
@@ -27,13 +27,17 @@ the invitation-first auth lifecycle (data model → creation → acceptance →
 ADMIN/STAFF activation → activation UI → role-aware sign-in handoff →
 onboarding handoff), the 4-step onboarding wizard, the STAFF operational
 workspace (`/staff`: NEED_HUMAN human-handoff queue with takeover,
-assigned-to-me section, appointment context — see PROMPT-17 below), and the
-ops toolchain (bootstrap/dev scripts, doctor/verify/security, gated
-releases, Vercel deployment, demo dataset, pilot distribution).
+assigned-to-me section, appointment context — see PROMPT-17), the business
+knowledge screen (`/settings/knowledge`: plain-text FAQ entries for the
+future AI assistant — see PROMPT-18), and the ops toolchain
+(bootstrap/dev scripts, doctor/verify/security, gated releases, Vercel
+deployment, demo dataset, pilot distribution).
 
-**Remaining Spec A placeholders:** business knowledge screen
-(`/settings/knowledge` stub). The `/sign-up` placeholder page remains in
-code but is superseded (invitation-first, DECISIONS #22).
+**All Spec A screens are implemented.** The `/sign-up` placeholder page
+remains in code but is superseded (invitation-first, DECISIONS #22).
+Remaining for the Spec A EXIT CRITERIA (not screens): the conversation
+engine slice — WhatsApp message transport + the AI assistant reply path,
+both so far kept behind interfaces with seeded messages (Spec A §8).
 
 **Quality:** `pnpm verify` green (lint/typecheck/format/build);
 `pnpm security` clean; `pnpm run doctor` NOT READY on this device only
@@ -65,6 +69,7 @@ code but is superseded (invitation-first, DECISIONS #22).
 | Customers directory         | `/customers`: server-backed debounced search (name/phone), rows with last conversation/appointment, honest states; `/customers/[id]`: identity + notes + appointment/conversation history, all rows navigable; ONE canonical creation path (`createCustomerAction` → customers service, typed `DUPLICATE_PHONE`); Smart Create Step 1 composes the same create dialog (route-layer composition)                                                                                                                                                                                                                                                                                                       | PROMPT-15       |
 | Team management             | `/admin/team`: member directory (identity, ADMIN/STAFF role, active state, self marker), open STAFF invitations (pending/accepted states), ONE canonical add-staff path (`createStaffInvitation` → existing `createInvitation` service; email-only input, ADMIN-only, tenant-scoped, fixed STAFF role), one-time manual invite-link delivery in `StaffInviteDialog`, STAFF activate/deactivate via `User.isActive` (ADMIN targets blocked — no lockout); invited-account activation generalized to invitation-role-driven (`activateInvitedMember`/`activateInvitedAccount`, DECISIONS #27) — `/invite/[token]` activates BOTH roles with role-aware sign-in handoff (STAFF never sent to onboarding) | PROMPT-16       |
 | Staff workspace             | `/staff` (STAFF-only, `(staff)` group): the human-handoff workspace — NEED_HUMAN queue (unassigned → mine → others) with takeover via the EXISTING `transitionConversation` action route-injected (one assignment system), assigned-to-me section, customer/last-message/status/activity/latest-appointment context rows; navigation made role-aware (staff see مهامي، not the admin dashboard); reply no longer silently reassigns owned conversations; conversation detail gains takeover for unassigned NEED_HUMAN (PROMPT-17, DECISIONS #28)                                                                                                                                                      | PROMPT-17       |
+| Business knowledge          | `/settings/knowledge`: ADMIN-only management of the plain-text FAQ/knowledge entries the future AI assistant will use (create/list/edit/confirmed remove, empty/loading/error/success states, question-as-natural-key semantics) over the canonical `Business.faqs` JSON field — ZERO schema changes, no RAG/vector/embeddings (PROMPT-18)                                                                                                                                                                                                                                                                                                                                                            | PROMPT-18       |
 | Ops (DX, non-product)       | Cross-platform bootstrap/dev scripts, `pnpm run setup/doctor`, `pnpm verify`, `pnpm security` + pre-commit hook, gated `pnpm release`, Vercel deploy toolchain (`pnpm deploy*`), Egyptian demo dataset + `DEMO_MODE`, distribution docs                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Ops 01–06       |
 | Ops (ship tooling)          | Lightweight operator ship path `pnpm ship patch/minor` (`scripts/ship.mjs`, dependency-free Node; DECISIONS #26): safety validation → version bump → one conventional commit → annotated tag → push main + tag → published GitHub Release; never re-runs the full gate (the prompt's `pnpm verify` is the gate), never deploys or touches the DB; full `pnpm release` preserved unchanged                                                                                                                                                                                                                                                                                                             | Ops 07          |
 
@@ -103,6 +108,13 @@ code but is superseded (invitation-first, DECISIONS #22).
 - Only STAFF members can be deactivated/reactivated in the Team UI
   (ADMIN members are protected by design — no accidental business
   lockout; ADMIN membership management is not exposed).
+- Knowledge entries are JSON rows of `Business.faqs`: no per-entry id,
+  active state, or timestamps (the DECISIONS #13 shape is
+  question/answer only) — removal is the supported state change, and
+  the trimmed question is the workflow-enforced natural key (one entry
+  per distinct question, 50-entry cap). JSON has no DB constraints, so
+  the duplicate/cap guards are workflow-level (same accepted-race
+  caveat as appointments/invitations at pilot scale).
 - Customer creation does not collect email (Spec A minimum: name, phone,
   optional notes); customer edit/deletion is not exposed in the UI.
 - A soft-deleted customer's phone still occupies the unique-per-business
@@ -204,15 +216,82 @@ on-device (Termux schema-engine limitation — apply from desktop/CI with
 - **Known limitations:** see "Key Known Limitations" (queue reads cap at
   the inbox's 100 conversations; appointment context shows the LATEST
   appointment, not specifically the next upcoming one).
-- **Exact next step:** PROMPT-18 — the last Spec A placeholder: the
-  business knowledge screen (`/settings/knowledge`, Spec A §6).
+- **Exact next step:** PROMPT-18 — the last Spec A screen placeholder:
+  the business knowledge screen (`/settings/knowledge`, Spec A §6).
+
+## PROMPT-18 — Business Knowledge Screen
+
+- **Objective:** Spec A §6 — give the authenticated Business ADMIN a
+  small, clear, Arabic-first interface for maintaining the plain-text
+  business knowledge the future AI assistant will use when answering
+  customer questions (prices, policies, preparation instructions,
+  recurring questions). Content management only — NOT an AI system,
+  no RAG/vector DB/embeddings, no vertical-specific fields.
+- **Implemented scope:** `/settings/knowledge` (ADMIN-only route) +
+  the isolated `src/features/knowledge` feature: list entries, create
+  (إضافة معلومة), edit (by current question), confirmed remove, useful
+  empty state, route loading skeleton, honest load-failure state with
+  retry, inline Arabic validation, calm success confirmation,
+  mobile-first single-column cards (usable at 360px), full RTL/logical
+  CSS, count live-region, and a settings-screen link card for
+  discoverability. Categories (أسعار/سياسات/تعليمات/أسئلة متكررة) are
+  copy guidance only — the data model stays question/answer.
+- **Files changed:** new `src/features/knowledge/` (types, schemas,
+  service, actions, screen + form/remove dialogs, README); new
+  `src/app/(app)/settings/knowledge/{page,loading}.tsx`; modified
+  `src/lib/validation/business.ts` (exported the existing `faqSchema`
+  as `faqEntrySchema` with Arabic bound messages), `src/lib/arabic.ts`
+  (`KNOWLEDGE_NOUNS`), `src/features/settings/components/settings-screen.tsx`
+  (link card), docs.
+- **Database/migration result:** ZERO schema changes — the canonical
+  storage is the existing `Business.faqs` JSON field (DECISIONS #13,
+  migration `20260826120000_onboarding_fields`); entries read/written
+  whole through `businessRepository.update`. No second knowledge
+  system. No migration authored or applied.
+- **Authorization/tenancy:** ADMIN-only (page `requireRole("ADMIN")`
+  redirect + service-layer `resolveScope` role check on every
+  operation + action actor built from session → DB user with
+  least-privilege fallback); the Business is ALWAYS derived
+  server-side from the authenticated actor — client `businessId`/
+  role keys are stripped by Zod and can never target another tenant
+  (writes go only to the actor's own business row).
+- **Tests:** temporary offline harness (removed after the run) —
+  48/48 checks: real service logic against in-memory repository
+  stand-ins (ADMIN list/create/edit/remove, STAFF forbidden on all
+  operations, businessless ADMIN rejected, duplicate question and
+  50-entry cap rejected, stale natural-key edits/removes fail
+  honestly, malformed stored JSON fails honestly with no rewrite,
+  tenant scoping captured at the repository boundary, hostile
+  businessId/role stripped), real markup via `renderToStaticMarkup`
+  (entries, exactly one primary action, edit/remove per entry, empty
+  state, count live-region, the assistant mental-model line), Zod
+  validation contracts (empty/oversized Arabic messages, trimming,
+  shared array cap), and source wiring checks (repository-only
+  Prisma, feature isolation, server-derived tenant, one canonical
+  storage, route thinness, no physical left/right CSS, no
+  RAG/vector/embedding code).
+- **Quality gates:** `pnpm db:generate`, `pnpm lint`,
+  `pnpm typecheck`, `pnpm format:check` (after one `pnpm format`
+  pass), `pnpm verify` (lint + typecheck + format + webpack build —
+  `/settings/knowledge` present in the route table), `pnpm security`
+  — ALL GREEN. No DB runtime check needed (no migration; the demo
+  DB's seeded FAQs render through the normal read path).
+- **Known limitations:** see "Key Known Limitations" (JSON entry
+  shape: no per-entry id/active state/timestamps; question natural
+  key with workflow-level guards).
+- **Exact next step:** PROMPT-19 — with every Spec A screen now
+  implemented, close the Spec A exit-criteria gap: the conversation
+  engine slice (WhatsApp message transport + the AI assistant reply
+  path behind the existing interfaces, Spec A §8), so a real
+  conversation can flow customer message → reply → booked
+  appointment.
 
 ## Next Step (product)
 
-**PROMPT-18 — Business Knowledge screen** (`/settings/knowledge`):
-structured FAQ/knowledge entries (plain stored text, no vector DB/RAG),
-ADMIN-only, tenant-scoped — the last remaining Spec A placeholder. Spec A
-exit criteria: see `SPEC_A.md → Spec Sequence & Exit Criteria`.
+**PROMPT-19 — Conversation engine slice** (operator-defined): the last
+Spec A exit-criteria gap — WhatsApp message transport and the AI
+assistant reply loop, kept behind the existing interfaces so far (see
+`SPEC_A.md` §8 + exit criteria). Spec A screen scope is COMPLETE.
 
 After each prompt: update this file (minimally) and append to
 `DECISIONS.md` when a decision was made.

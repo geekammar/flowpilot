@@ -23,7 +23,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { CONFIRMATION_MODES, TIMEZONES, VERTICALS } from "@/lib/validation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircleIcon, LoaderCircleIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  CheckCircleIcon,
+  ChevronLeftIcon,
+  LoaderCircleIcon,
+} from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
@@ -85,6 +91,28 @@ export function SettingsScreen({
         title="الإعدادات"
         description="كيف تعمل منشأتك — بياناتها الأساسية وسلوك الحجز فيها."
       />
+
+      {/* Knowledge lives at its own route (PROMPT-18): a link, not a
+          second form inside this feature. */}
+      <Link
+        href="/settings/knowledge"
+        className="group flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs transition-shadow hover:shadow-sm focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <div className="bg-muted text-muted-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
+          <BookOpenIcon aria-hidden className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold">معلومات للمساعد</h2>
+          <p className="text-muted-foreground mt-0.5 text-sm leading-6">
+            الأسعار والسياسات والإجابات المتكررة التي سيستخدمها المساعد الذكي في
+            الردود.
+          </p>
+        </div>
+        <ChevronLeftIcon
+          aria-hidden
+          className="text-muted-foreground size-5 shrink-0 transition-transform group-hover:-translate-x-0.5"
+        />
+      </Link>
 
       <form onSubmit={submit} className="space-y-8" noValidate>
         {/* ─── Section 1: بيانات المنشأة ─── */}

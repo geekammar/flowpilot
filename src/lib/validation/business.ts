@@ -84,9 +84,25 @@ export const TIMEZONES = [
   { value: "Asia/Dubai", label: "دبي" },
 ] as const;
 
-const faqSchema = z.object({
-  question: z.string().trim().min(2, "السؤال قصير جداً").max(500),
-  answer: z.string().trim().min(2, "الإجابة قصيرة جداً").max(2000),
+/**
+ * Business knowledge entry (Spec A §6) — the canonical plain-text
+ * question/answer contract stored as JSON entries in `Business.faqs`
+ * (DECISIONS #13). Exported since PROMPT-18: the knowledge feature's
+ * form and workflow share this single contract.
+ */
+export const faqEntrySchema = z.object({
+  question: z
+    .string()
+    .trim()
+    .min(1, "اكتب السؤال")
+    .min(2, "السؤال قصير جداً")
+    .max(500, "السؤال طويل جداً (٥٠٠ حرف كحد أقصى)"),
+  answer: z
+    .string()
+    .trim()
+    .min(1, "اكتب الإجابة")
+    .min(2, "الإجابة قصيرة جداً")
+    .max(2000, "الإجابة طويلة جداً (٢٠٠٠ حرف كحد أقصى)"),
 });
 
 const createBusinessSchema = z.object({
@@ -99,7 +115,7 @@ const createBusinessSchema = z.object({
   workingHours: workingHoursSchema.optional(),
   slotDurationMinutes: z.number().int().min(5).max(480).optional(),
   confirmationMode: confirmationModeSchema.optional(),
-  faqs: z.array(faqSchema).max(50).optional(),
+  faqs: z.array(faqEntrySchema).max(50, "الحد الأقصى ٥٠ معلومة").optional(),
   cancellationPolicy: z.string().trim().max(2000).optional(),
 });
 
@@ -107,7 +123,7 @@ const updateBusinessSchema = createBusinessSchema.partial();
 
 export type CreateBusinessDto = z.infer<typeof createBusinessSchema>;
 export type UpdateBusinessDto = z.infer<typeof updateBusinessSchema>;
-export type FaqDto = z.infer<typeof faqSchema>;
+export type FaqDto = z.infer<typeof faqEntrySchema>;
 
 export const businessValidation = {
   create: createBusinessSchema,

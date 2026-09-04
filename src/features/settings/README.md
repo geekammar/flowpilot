@@ -50,9 +50,14 @@ vertical-agnostic; the vertical field is discovery metadata only.
   surface for hours is a follow-up slice).
 - Business account activate/deactivate (Spec A §3 — deliberate separate
   action with its own guardrails).
-- Business knowledge/FAQs screen (`/settings/knowledge`, Spec A §6).
 - Default appointment duration — intentionally NOT exposed here: the
   domain stores per-service durations (`Service.durationMinutes`) and a
   slot-granularity default (`Business.slotDurationMinutes`); neither is
   "default appointment duration", and no safe representation exists, so
   per the prompt rule it is documented rather than invented.
+
+## Related surfaces
+
+- Business knowledge lives at `/settings/knowledge` as its own feature
+  (`src/features/knowledge`, PROMPT-18) — this screen links to it (a
+  URL link, not a feature import); it is not part of the settings form.

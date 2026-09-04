@@ -55,10 +55,12 @@ collect evidence.
 - **Implemented (PROMPT-09):** `/settings` — business identity (name,
   vertical, city, WhatsApp number, timezone) and booking behavior
   (confirmation mode manual/automatic + cancellation policy),
-  ADMIN-only, tenant-scoped. Working-hours editing, account
-  activate/deactivate, and the knowledge screen remain follow-up
-  slices. The confirmation mode drives the server-derived initial
-  status of new appointments.
+  ADMIN-only, tenant-scoped. Working-hours editing and account
+  activate/deactivate remain follow-up slices. The confirmation mode
+  drives the server-derived initial status of new appointments.
+- **Implemented (PROMPT-18):** `/settings/knowledge` — business
+  knowledge entries (§6) over the plain-text `Business.faqs` JSON
+  storage, ADMIN-only, tenant-scoped.
 
 ### 4. Services
 

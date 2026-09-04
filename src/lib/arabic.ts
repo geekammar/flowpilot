@@ -80,3 +80,11 @@ export const SLOT_NOUNS: ArabicCountNouns = {
   few: "أوقات متاحة",
   many: "وقتاً متاحاً",
 };
+
+export const KNOWLEDGE_NOUNS: ArabicCountNouns = {
+  zero: "لا توجد معلومات",
+  one: "معلومة واحدة",
+  two: "معلومتان",
+  few: "معلومات",
+  many: "معلومة",
+};
