@@ -3,7 +3,8 @@
 Booking lifecycle: creation, confirmation, rescheduling, cancellation, reminders,
 deterministic availability (PROMPT-10), and the Smart Create Appointment flow
 (PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 — available-slot selection +
-PROMPT-13 Step 5 — review).
+PROMPT-13 Step 5 — review + PROMPT-14 Step 6 — confirmation / appointment
+creation).
 
 ## Isolation rules
 
@@ -20,6 +21,9 @@ PROMPT-13 Step 5 — review).
 
 - `actions/appointment-actions.ts` — create/status/reschedule writes
   (tenant-scoped, conflict-checked, status transitions enforced).
+  `createAppointment` is a thin session wrapper: the actor is derived
+  from the authenticated session + DB user, and all rules live in the
+  create service (PROMPT-14).
 - `actions/availability-actions.ts` — `getAvailabilityAction`: thin
   `"use server"` read hook for the availability service (consumed by
   Step 4 of the Smart Create flow).
@@ -32,6 +36,15 @@ PROMPT-13 Step 5 — review).
   Zod strips every other key). Step 4 consumes this schema verbatim.
 - `schemas/booking-flow-schema.ts` — booking-flow inputs: customer search
   (`{query}` ONLY — hostile keys stripped).
+- `server/appointment-create-service.ts` — THE single
+  appointment-creation engine (PROMPT-14): the exact rules the
+  `createAppointment` action has enforced since v0.1.0 (Zod boundary
+  validation, tenant isolation, active-service check, server-derived
+  `endTime` + initial status from `Business.confirmationMode`,
+  transactional conflict check), extracted into the feature's
+  injectable-deps service pattern so it stays verifiable without a
+  live database. Failures are typed codes
+  (`CreateAppointmentErrorCode`) with Arabic messages.
 - `server/appointment-queries.ts` — agenda/detail reads.
 - `server/availability-service.ts` — deterministic availability
   calculation (see Semantics below).
@@ -42,13 +55,14 @@ PROMPT-13 Step 5 — review).
 - `components/smart-create/*` — the Smart Create flow (see below).
 - `types.ts` — agenda/detail/option types, the availability result
   contract, the 6-step flow constants, `SelectedSlot`, the review-check
+  state, the typed create-appointment result, the Step 6 submission
   state, and booking-flow option types.
 
-## Smart Create flow (Steps 1–5)
+## Smart Create flow (Steps 1–6)
 
 `/appointments/new` is the Smart Create Appointment flow: العميل → الخدمة
-→ التاريخ → الوقت → المراجعة, shown in a 6-step progress indicator where
-ONLY steps 1–5 are active (التأكيد stays locked until a later prompt).
+→ التاريخ → الوقت → المراجعة → التأكيد, shown in a 6-step progress
+indicator where all six steps are active.
 
 - **Step 1 — العميل** (`customer-step.tsx`): search by name or phone
   (debounced, `searchBookingCustomersAction` → `searchBookingCustomers`,
@@ -92,28 +106,50 @@ ONLY steps 1–5 are active (التأكيد stays locked until a later prompt).
   `getAvailabilityAction` (one request per click, no mount-time query,
   no second engine, no reservation) — a stale slot clears through the
   wizard-state mechanism and keeps the user on the review with an
-  obvious اختيار وقت آخر action; a verified slot shows an honest
-  status panel because Step 6 (التأكيد) is still locked: NO appointment
-  is ever created from Step 5.
+  obvious اختيار وقت آخر action; a verified slot is a HAND-OFF (not a
+  reservation) and moves the flow to Step 6.
+- **Step 6 — التأكيد** (`confirm-step.tsx`, PROMPT-14): the final
+  confirmation screen. BEFORE CREATE it shows a read-only summary
+  (customer name + phone, service + duration, long Arabic date, slot
+  start/end, business timezone) plus the resulting appointment behavior
+  derived from the Business's `confirmationMode` (server-passed prop —
+  never client input). The PRIMARY action (تأكيد الحجز, in the wizard
+  footer) calls the EXISTING `createAppointment` action — the canonical
+  write path; the step itself imports no write path and no availability
+  engine. While creating: duplicate submission is blocked (in-flight
+  ref + disabled buttons), loading is announced (role=status /
+  aria-live), and the summary stays visible. SUCCESS is rendered ONLY
+  from the server-confirmed result: the created appointment's status
+  through the canonical status badge, one obvious primary action
+  (عرض الموعد → the existing `/appointments/[id]` detail page), and the
+  wizard is cleared only after success is known (إنشاء موعد آخر).
+  ERRORS are typed panels (role=alert): a `SLOT_CONFLICT` explains in
+  Arabic that the time is no longer available and offers اختيار وقت
+  آخر — which clears the stale slot through the wizard mechanism,
+  returns to Step 4, and drops the cached availability query so the
+  slot step refetches through the SAME `getAvailabilityAction`; every
+  other failure is retryable without leaving the flow. No false
+  success is ever displayed.
 - **Wizard state** lives in `smart-create-appointment.tsx` only
   (`customerId`/`serviceId`/`date`/`selectedSlot` + current screen +
-  the review-check state): moving back and forth never resets
-  selections; each step's continue action stays disabled until its
-  selection is valid; completed steps in the progress indicator are
-  clickable for safe back-navigation (onboarding-wizard convention).
-  Changing the service or the date CLEARS the slot selection (a slot is
-  only valid for the inputs it was computed for); changing the customer
-  does not (availability does not depend on the customer). Step 4 is
-  SELECTION ONLY and Step 5 is REVIEW ONLY — no appointment is created
-  from either; the existing `createAppointment` action remains the sole
-  write path (untouched, awaiting the Step 6 confirmation prompt).
+  the review-check state + the Step 6 submission state): moving back
+  and forth never resets selections; each step's continue action stays
+  disabled until its selection is valid; completed steps in the
+  progress indicator are clickable for safe back-navigation
+  (onboarding-wizard convention). Changing the service or the date
+  CLEARS the slot selection (a slot is only valid for the inputs it
+  was computed for); changing the customer does not (availability
+  does not depend on the customer). Step 4 is SELECTION ONLY and
+  Step 5 is REVIEW ONLY — no appointment is created from either; the
+  `createAppointment` action (backed by the create service) remains
+  the sole write path, consumed only by Step 6's primary action.
 
 The interim manual time-entry details screen from PROMPT-11 was REMOVED
 (superseded by Step 4) — the manual start-time entry is no longer part of
-the Smart Create path. The flow currently ends at the review step: the
-verified-review status panel states honestly that the final confirmation
-step (التأكيد) is not enabled yet, so no appointment can be created from
-the wizard until the Step 6 prompt lands.
+the Smart Create path. The flow completes end-to-end at Step 6: a verified
+review hands off to the confirmation screen, which creates the appointment
+through the canonical `createAppointment` write path and reports the
+server-confirmed outcome (status badge + the appointment's detail page).
 
 ## Availability semantics (PROMPT-10)
 

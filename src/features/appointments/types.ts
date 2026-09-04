@@ -21,13 +21,14 @@ export type AppointmentActionResult =
 
 /**
  * Smart Create Appointment flow (PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 +
- * PROMPT-13 Step 5).
+ * PROMPT-13 Step 5 + PROMPT-14 Step 6).
  *
- * The intended flow is 6 steps — العميل → الخدمة → التاريخ → الوقت →
- * المراجعة → التأكيد — with the first 5 implemented; step 6 (final
- * confirmation) stays locked in the UI. `BOOKING_FLOW_ACTIVE_STEPS`
- * marks the boundary so the progress indicator (and tests) share one
- * source of truth.
+ * The flow is 6 steps — العميل → الخدمة → التاريخ → الوقت → المراجعة
+ * → التأكيد — all active in this release: Step 6 confirms the reviewed
+ * details and creates the appointment through the existing
+ * `createAppointment` write path. `BOOKING_FLOW_ACTIVE_STEPS` marks
+ * the boundary so the progress indicator (and tests) share one source
+ * of truth.
  */
 export const BOOKING_FLOW_STEPS = [
   { label: "العميل" },
@@ -38,18 +39,18 @@ export const BOOKING_FLOW_STEPS = [
   { label: "التأكيد" },
 ] as const;
 
-export const BOOKING_FLOW_ACTIVE_STEPS = 5 as const;
+export const BOOKING_FLOW_ACTIVE_STEPS = 6 as const;
 
-/** Wizard screen — one per ACTIVE flow step (step 6 remains locked). */
+/** Wizard screen — one per flow step. */
 export type BookingFlowScreen =
-  "customer" | "service" | "date" | "slot" | "review";
+  "customer" | "service" | "date" | "slot" | "review" | "confirm";
 
 /**
  * Step 5 (المراجعة) slot-revalidation state. The review's primary
  * action re-checks the selected slot through the EXISTING availability
- * layer before anything else may happen; "verified" never creates an
- * appointment (step 6 stays locked — the state only records that the
- * reviewed slot is still bookable).
+ * layer before the flow may continue; "verified" is a HAND-OFF to the
+ * confirmation step, never a reservation — the write path's
+ * transactional conflict check remains the final guard.
  */
 export type ReviewCheckState =
   | { status: "idle" }
@@ -59,8 +60,51 @@ export type ReviewCheckState =
   | { status: "verified" };
 
 /**
+ * Typed failure codes for `createAppointment` (PROMPT-14 Step 6) so
+ * the confirmation step can react to domain failures honestly instead
+ * of guessing from message strings: `SLOT_CONFLICT` returns the user
+ * to Step 4 to pick another time; every other failure is reported as
+ * retryable without leaving the flow.
+ */
+export type CreateAppointmentErrorCode =
+  | "VALIDATION"
+  | "NO_BUSINESS"
+  | "CUSTOMER_NOT_FOUND"
+  | "SERVICE_UNAVAILABLE"
+  | "END_OF_DAY"
+  | "SLOT_CONFLICT"
+  | "CREATE_FAILED";
+
+/**
+ * `createAppointment` result contract: success carries the created
+ * appointment's id AND its actual server-derived status (the canonical
+ * status system — never client input); failures carry a typed code
+ * plus an Arabic message.
+ */
+export type CreateAppointmentActionResult =
+  | { success: true; appointmentId: string; status: AppointmentStatus }
+  | { success: false; code: CreateAppointmentErrorCode; message: string };
+
+/**
+ * Step 6 (التأكيد) submission lifecycle, owned by the wizard
+ * container. "success" is ONLY ever recorded from the server's own
+ * result — the UI never claims an appointment exists before the write
+ * path confirms it, and the wizard state is only cleared after
+ * success is known.
+ */
+export type ConfirmSubmitState =
+  | { status: "idle" }
+  | { status: "submitting" }
+  | {
+      status: "success";
+      appointmentId: string;
+      appointmentStatus: AppointmentStatus;
+    }
+  | { status: "error"; code: CreateAppointmentErrorCode; message: string };
+
+/**
  * Step 4 (الوقت) selection — the typed value handed to the review step
- * (PROMPT-13) and the future confirmation step. It mirrors the
+ * (PROMPT-13) and the confirmation step (PROMPT-14). It mirrors the
  * appointment domain's wall-clock conventions exactly: business-local
  * "HH:mm" start/end, start + `Service.durationMinutes`.
  */

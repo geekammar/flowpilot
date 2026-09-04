@@ -1,0 +1,191 @@
+/**
+ * Appointment creation workflow (PROMPT-14 — Smart Create Step 6).
+ *
+ * THE single appointment-creation engine: the exact rules the
+ * `createAppointment` server action has enforced since v0.1.0, moved
+ * into the feature's established service pattern (availability /
+ * booking-flow) so the action stays a thin session wrapper while the
+ * workflow logic stays verifiable without a live database. Nothing
+ * about the write semantics changed:
+ *
+ * - Zod validation at the server boundary (`notes` required-but-
+ *   emptyable, hostile keys stripped — a client can never supply
+ *   `businessId`, `status`, or `assignedUserId`).
+ * - The Business is ALWAYS the actor's own, derived from the
+ *   authenticated session — tenant isolation means cross-business
+ *   customer/service ids are indistinguishable from missing ones.
+ * - Only active, non-deleted services are bookable.
+ * - `endTime` is derived SERVER-side from the service's duration.
+ * - The initial status is derived from `Business.confirmationMode`
+ *   (PROMPT-09) — never client input.
+ * - The transactional conflict check in
+ *   `AppointmentRepository.createWithConflictCheck` is the final
+ *   guard; a lost slot surfaces as the typed `SLOT_CONFLICT` failure.
+ *
+ * Repository collaborators are injectable (defaulting to the app
+ * singletons) — the established invitations/services/availability
+ * pattern.
+ */
+
+import { createAppointmentFormSchema } from "@/features/appointments/schemas/appointment-schema";
+import type { CreateAppointmentActionResult } from "@/features/appointments/types";
+import type {
+  AppointmentRepository,
+  BusinessRepository,
+  CustomerRepository,
+  ServiceRepository,
+} from "@/server/repositories";
+import {
+  appointmentRepository,
+  businessRepository,
+  customerRepository,
+  serviceRepository,
+} from "@/server/repositories";
+import type { UserRole } from "@/types/domain";
+
+/** Authorization context derived from the authenticated session. */
+export type AppointmentCreateActor = {
+  userId: string;
+  role: UserRole;
+  /**
+   * The actor's OWN business — the only business an appointment is
+   * ever created for. Client input can never supply or override it.
+   */
+  businessId: string | null;
+};
+
+export type AppointmentCreateServiceDeps = {
+  customerRepository: Pick<CustomerRepository, "findById">;
+  serviceRepository: Pick<ServiceRepository, "findById">;
+  businessRepository: Pick<BusinessRepository, "findById">;
+  appointmentRepository: Pick<AppointmentRepository, "createWithConflictCheck">;
+};
+
+/** Production dependencies (app singletons). */
+export const defaultAppointmentCreateServiceDeps: AppointmentCreateServiceDeps =
+  {
+    customerRepository,
+    serviceRepository,
+    businessRepository,
+    appointmentRepository,
+  };
+
+/**
+ * Add minutes to a business-local "HH:mm" wall-clock time. Returns
+ * null when the result would cross midnight (the service no longer
+ * fits inside the day). Shared by the create workflow and the
+ * reschedule action.
+ */
+export function addMinutes(time: string, minutes: number) {
+  const [hours = 0, currentMinutes = 0] = time.split(":").map(Number);
+  const total = hours * 60 + currentMinutes + minutes;
+  if (total >= 24 * 60) return null;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Create an appointment for the actor's business. Composes the same
+ * protected write the agenda path always used; typed failure codes
+ * let the caller (Smart Create Step 6) react to domain failures —
+ * `SLOT_CONFLICT` above all — without parsing message strings.
+ */
+export async function createAppointmentRecord(
+  deps: AppointmentCreateServiceDeps,
+  actor: AppointmentCreateActor,
+  input: unknown,
+): Promise<CreateAppointmentActionResult> {
+  const parsed = createAppointmentFormSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      code: "VALIDATION",
+      message: parsed.error.issues[0]?.message ?? "بيانات الموعد غير صالحة",
+    };
+  }
+  if (!actor.businessId) {
+    return {
+      success: false,
+      code: "NO_BUSINESS",
+      message: "أكمل إعداد المنشأة أولاً",
+    };
+  }
+
+  const [customer, service] = await Promise.all([
+    deps.customerRepository.findById(parsed.data.customerId),
+    deps.serviceRepository.findById(parsed.data.serviceId),
+  ]);
+  if (!customer || customer.businessId !== actor.businessId) {
+    return {
+      success: false,
+      code: "CUSTOMER_NOT_FOUND",
+      message: "العميل غير موجود",
+    };
+  }
+  if (
+    !service ||
+    service.businessId !== actor.businessId ||
+    !service.isActive
+  ) {
+    return {
+      success: false,
+      code: "SERVICE_UNAVAILABLE",
+      message: "الخدمة غير متاحة",
+    };
+  }
+
+  const endTime = addMinutes(parsed.data.startTime, service.durationMinutes);
+  if (!endTime) {
+    return {
+      success: false,
+      code: "END_OF_DAY",
+      message: "الخدمة تتجاوز نهاية اليوم",
+    };
+  }
+
+  // Booking confirmation mode (PROMPT-09): server-derived from the
+  // Business record — never client input. "automatic" confirms new
+  // appointments on creation; "manual" (default) keeps them PENDING.
+  const business = await deps.businessRepository.findById(actor.businessId);
+  if (!business) {
+    return {
+      success: false,
+      code: "NO_BUSINESS",
+      message: "لا يمكن الوصول إلى المنشأة",
+    };
+  }
+  const initialStatus =
+    business.confirmationMode === "automatic" ? "CONFIRMED" : "PENDING";
+
+  try {
+    const appointment =
+      await deps.appointmentRepository.createWithConflictCheck({
+        businessId: actor.businessId,
+        customerId: customer.id,
+        serviceId: service.id,
+        assignedUserId: actor.userId,
+        date: parsed.data.date,
+        startTime: parsed.data.startTime,
+        endTime,
+        notes: parsed.data.notes || undefined,
+        status: initialStatus,
+      });
+    if (!appointment) {
+      return {
+        success: false,
+        code: "SLOT_CONFLICT",
+        message: "يوجد موعد آخر متداخل في هذا الوقت",
+      };
+    }
+    return {
+      success: true,
+      appointmentId: appointment.id,
+      status: appointment.status,
+    };
+  } catch {
+    return {
+      success: false,
+      code: "CREATE_FAILED",
+      message: "تعذر إنشاء الموعد الآن",
+    };
+  }
+}

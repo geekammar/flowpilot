@@ -2,27 +2,22 @@
 
 import {
   appointmentStatusActionSchema,
-  createAppointmentFormSchema,
   rescheduleAppointmentSchema,
 } from "@/features/appointments/schemas/appointment-schema";
-import type { AppointmentActionResult } from "@/features/appointments/types";
-import { requireUser } from "@/server/auth/guards";
 import {
-  appointmentRepository,
-  businessRepository,
-  customerRepository,
-  serviceRepository,
-  userRepository,
-} from "@/server/repositories";
+  addMinutes,
+  createAppointmentRecord,
+  defaultAppointmentCreateServiceDeps,
+  type AppointmentCreateActor,
+} from "@/features/appointments/server/appointment-create-service";
+import type {
+  AppointmentActionResult,
+  CreateAppointmentActionResult,
+} from "@/features/appointments/types";
+import { requireUser } from "@/server/auth/guards";
+import { appointmentRepository, userRepository } from "@/server/repositories";
 
 import { revalidatePath } from "next/cache";
-
-function addMinutes(time: string, minutes: number) {
-  const [hours = 0, currentMinutes = 0] = time.split(":").map(Number);
-  const total = hours * 60 + currentMinutes + minutes;
-  if (total >= 24 * 60) return null;
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
 
 function storedDuration(startTime: Date, endTime: Date) {
   return Math.round((endTime.getTime() - startTime.getTime()) / 60_000);
@@ -43,58 +38,37 @@ function refreshAppointments(id?: string) {
   revalidatePath("/");
 }
 
+/**
+ * THE canonical appointment-creation write path (Smart Create Step 6,
+ * PROMPT-14, is its first UI consumer). Thin session wrapper only:
+ * the actor is derived from the authenticated session + DB user (the
+ * Business is ALWAYS the actor's own — a client-provided businessId
+ * or role can never override it), and every rule (Zod boundary
+ * validation, tenant isolation, active-service check, server-derived
+ * initial status, transactional conflict check) lives in
+ * `createAppointmentRecord`. Failures are typed codes with Arabic
+ * messages; success carries the created appointment's id and its
+ * ACTUAL server-derived status.
+ */
 export async function createAppointment(
   input: unknown,
-): Promise<AppointmentActionResult> {
-  const parsed = createAppointmentFormSchema.safeParse(input);
-  if (!parsed.success) {
-    return failure(
-      parsed.error.issues[0]?.message ?? "بيانات الموعد غير صالحة",
-    );
-  }
-  const user = await currentUser();
-  if (!user?.businessId) return failure("أكمل إعداد المنشأة أولاً");
-
-  const [customer, service] = await Promise.all([
-    customerRepository.findById(parsed.data.customerId),
-    serviceRepository.findById(parsed.data.serviceId),
-  ]);
-  if (!customer || customer.businessId !== user.businessId) {
-    return failure("العميل غير موجود");
-  }
-  if (!service || service.businessId !== user.businessId || !service.isActive) {
-    return failure("الخدمة غير متاحة");
-  }
-
-  const endTime = addMinutes(parsed.data.startTime, service.durationMinutes);
-  if (!endTime) return failure("الخدمة تتجاوز نهاية اليوم");
-
-  // Booking confirmation mode (PROMPT-09): server-derived from the
-  // Business record — never client input. "automatic" confirms new
-  // appointments on creation; "manual" (default) keeps them PENDING.
-  const business = await businessRepository.findById(user.businessId);
-  if (!business) return failure("لا يمكن الوصول إلى المنشأة");
-  const initialStatus =
-    business.confirmationMode === "automatic" ? "CONFIRMED" : "PENDING";
-
-  try {
-    const appointment = await appointmentRepository.createWithConflictCheck({
-      businessId: user.businessId,
-      customerId: customer.id,
-      serviceId: service.id,
-      assignedUserId: user.id,
-      date: parsed.data.date,
-      startTime: parsed.data.startTime,
-      endTime,
-      notes: parsed.data.notes || undefined,
-      status: initialStatus,
-    });
-    if (!appointment) return failure("يوجد موعد آخر متداخل في هذا الوقت");
-    refreshAppointments(appointment.id);
-    return { success: true, appointmentId: appointment.id };
-  } catch {
-    return failure("تعذر إنشاء الموعد الآن");
-  }
+): Promise<CreateAppointmentActionResult> {
+  const session = await requireUser();
+  const user = await userRepository.findById(session.user.id);
+  const actor: AppointmentCreateActor = {
+    userId: session.user.id,
+    // No user record (deleted mid-session) → least privilege: no
+    // business, so no appointment can ever be created.
+    role: user?.role ?? "STAFF",
+    businessId: user?.businessId ?? null,
+  };
+  const result = await createAppointmentRecord(
+    defaultAppointmentCreateServiceDeps,
+    actor,
+    input,
+  );
+  if (result.success) refreshAppointments(result.appointmentId);
+  return result;
 }
 
 export async function updateAppointmentStatus(

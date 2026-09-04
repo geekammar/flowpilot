@@ -78,11 +78,12 @@ export function getMissingReviewFields(input: {
  * Step 5 — المراجعة (PROMPT-13). One-glance booking summary of the
  * already-selected customer, service, date, and slot, each with an
  * obvious تعديل affordance back to its step. The primary action lives
- * in the wizard footer (the container owns the revalidation): it never
- * creates an appointment and only allows leaving the step after the
- * slot is revalidated against the CURRENT availability. Step 6
- * (التأكيد) stays locked — `checkState: "verified"` communicates that
- * honestly instead of navigating.
+ * in the wizard footer (the container owns the revalidation): it
+ * never creates an appointment and only allows leaving the step after
+ * the slot is revalidated against the CURRENT availability. A
+ * verified review is a HAND-OFF to Step 6 (التأكيد), not a
+ * reservation — the final write still relies on the conflict check
+ * inside `createAppointment`.
  */
 export function ReviewStep({
   customer,
@@ -299,8 +300,8 @@ export function ReviewStep({
             تم التحقق من التفاصيل
           </p>
           <p className="text-sm">
-            الوقت المحدد ما زال متاحاً حتى الآن. خطوة التأكيد النهائي غير مفعّلة
-            بعد — لن يُنشأ الموعد من هذه الشاشة.
+            الوقت المحدد ما زال متاحاً حتى الآن — يمكنك المتابعة إلى التأكيد
+            النهائي.
           </p>
         </div>
       ) : null}
