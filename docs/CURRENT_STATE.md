@@ -2,7 +2,8 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-04 — PROMPT-10 (Smart Availability Foundation).
+> Last updated: 2026-09-04 — PROMPT-11 (Smart Create Appointment
+> Foundation, Steps 1–3).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -129,6 +130,27 @@ serviceId})` answers "which start times are actually bookable?" using
   PROMPT-11 Smart Create. Zero schema changes; verified offline 36/36
   checks with in-memory stand-ins running the real service code (no
   live DB on this device — honestly stated).
+- **Smart create appointment foundation (PROMPT-11): ✅ implemented**
+  (Steps 1–3 at `/appointments/new`, entered from every existing Create
+  Appointment action): العميل — debounced search by name or phone
+  through the existing tenant-scoped customer repository primitive
+  (server action; empty/selected/change states; actionable empty
+  states), الخدمة — active services only as radio-cards (name +
+  duration; ADMIN gets an إدارة الخدمات link in the empty state),
+  التاريخ — a 14-day quick-pick strip from business-timezone today plus
+  a native date input (min = business today) validated by the shared
+  `appointmentDateSchema` (NO availability calculation — the next step
+  consumes the PROMPT-10 layer). A 6-step progress indicator shows the
+  intended flow with only steps 1–3 active (الوقت/المراجعة/التأكيد
+  locked); completed steps are clickable for safe back-navigation and
+  selections (`{customerId, serviceId, date}` in one client container)
+  never reset while moving back and forth. The appointment-creation
+  capability is preserved through an interim details screen (time +
+  note + create) that reuses the existing `createAppointment` action
+  until PROMPT-12 replaces it with available-slot selection. Zero
+  schema changes; verified offline 60/60 with in-memory stand-ins
+  running the real service code (no live DB on this device — honestly
+  stated).
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
@@ -169,14 +191,17 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   Management Foundation: published 2026-09-03 (PROMPT-08, same
   workflow). v0.8.0 — Business Settings Foundation: published 2026-09-03
   (PROMPT-09, same workflow). v0.9.0 — Smart Availability Foundation:
-  published 2026-09-04 (PROMPT-10, same workflow) — every tag is pushed
-  to origin and has a GitHub Release; the newest tag is the current
-  Latest. Local `main` and origin `main` are in sync (see
-  `PROJECT_STATUS.md → Release Status`). Open user action: the repo is
-  public but must be private (GITHUB_WORKFLOW.md / DECISIONS #18).
-- **Next step (product):** PROMPT-11 — Smart Create Appointment
-  Foundation, consuming the deterministic availability layer through
-  `getAvailabilityAction`. The remaining Spec A placeholders (customers
+  published 2026-09-04 (PROMPT-10, same workflow). v0.10.0 — Smart
+  Create Appointment Foundation (Steps 1–3): published 2026-09-04
+  (PROMPT-11, same workflow) — every tag is pushed to origin and has a
+  GitHub Release; the newest tag is the current Latest. Local `main`
+  and origin `main` are in sync (see `PROJECT_STATUS.md → Release
+Status`). Open user action: the repo is public but must be private
+  (GITHUB_WORKFLOW.md / DECISIONS #18).
+- **Next step (product):** PROMPT-12 — Smart Create Appointment:
+  Available-Slot Selection (Step 4), consuming the deterministic
+  availability layer through `getAvailabilityAction` and replacing the
+  interim details screen. The remaining Spec A placeholders (customers
   directory, business knowledge screen, team, staff area) follow per
   the operator's choice.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

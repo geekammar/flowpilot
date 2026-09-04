@@ -1,14 +1,10 @@
 import type {
   AppointmentAgendaItem,
   AppointmentDetailData,
-  AppointmentOption,
-  ServiceOption,
 } from "@/features/appointments/types";
 import {
   appointmentRepository,
   conversationRepository,
-  customerRepository,
-  serviceRepository,
 } from "@/server/repositories";
 
 function serializeAppointment(appointment: {
@@ -56,28 +52,6 @@ export async function getAppointmentDetail(
     ...serializeAppointment(appointment),
     conversationId: conversation?.id ?? null,
   };
-}
-
-export async function getAppointmentFormOptions(businessId: string) {
-  const [customers, services] = await Promise.all([
-    customerRepository.listByBusiness(businessId, {
-      rawPagination: { pageSize: 100 },
-    }),
-    serviceRepository.listByBusiness(businessId, {
-      rawPagination: { pageSize: 100 },
-    }),
-  ]);
-
-  const customerOptions: AppointmentOption[] = customers.map((customer) => ({
-    id: customer.id,
-    name: customer.name,
-  }));
-  const serviceOptions: ServiceOption[] = services.map((service) => ({
-    id: service.id,
-    name: service.name,
-    durationMinutes: service.durationMinutes,
-  }));
-  return { customers: customerOptions, services: serviceOptions };
 }
 
 export function todayInTimezone(timeZone: string) {

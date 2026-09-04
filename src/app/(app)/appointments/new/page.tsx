@@ -1,8 +1,11 @@
-import { CreateAppointmentForm } from "@/features/appointments/components/create-appointment-form";
+import { SmartCreateAppointment } from "@/features/appointments/components/smart-create/smart-create-appointment";
+import { todayInTimezone } from "@/features/appointments/server/appointment-queries";
 import {
-  getAppointmentFormOptions,
-  todayInTimezone,
-} from "@/features/appointments/server/appointment-queries";
+  defaultBookingFlowServiceDeps,
+  listBookingServices,
+  searchBookingCustomers,
+  type BookingFlowActor,
+} from "@/features/appointments/server/booking-flow-service";
 import { PageHeader } from "@/components/shared/page-header";
 import { appointmentDateSchema } from "@/lib/validation";
 import { requireUser } from "@/server/auth/guards";
@@ -15,6 +18,12 @@ export const metadata: Metadata = {
   title: "إنشاء موعد",
 };
 
+/**
+ * Smart Create Appointment flow (PROMPT-11 — Steps 1–3). The Business
+ * is derived from the authenticated session (never client input), the
+ * initial customers + active services are read through the
+ * booking-flow service (tenant-scoped), and `today` is business-local.
+ */
 export default async function NewAppointmentPage({
   searchParams,
 }: {
@@ -24,24 +33,41 @@ export default async function NewAppointmentPage({
   if (!session.user.businessId) redirect("/onboarding");
   const business = await businessRepository.findById(session.user.businessId);
   if (!business) redirect("/onboarding");
+
   const params = await searchParams;
   const parsedDate = appointmentDateSchema.safeParse(params.date);
   const defaultDate = parsedDate.success
     ? parsedDate.data
     : todayInTimezone(business.timezone);
-  const options = await getAppointmentFormOptions(business.id);
+
+  // Session role normalization: anything non-ADMIN behaves as STAFF
+  // (least privilege — same fallback as the availability action).
+  const role = session.user.role === "ADMIN" ? "ADMIN" : "STAFF";
+  const actor: BookingFlowActor = {
+    userId: session.user.id,
+    role,
+    businessId: business.id,
+  };
+  const [customerResult, serviceResult] = await Promise.all([
+    searchBookingCustomers(defaultBookingFlowServiceDeps, actor, { query: "" }),
+    listBookingServices(defaultBookingFlowServiceDeps, actor),
+  ]);
 
   return (
-    <div className="animate-fade-in-up space-y-8">
+    <div className="animate-fade-in-up space-y-6">
       <PageHeader
         title="إنشاء موعد"
-        description="اختر العميل والخدمة والوقت، وسنحسب مدة الموعد تلقائياً."
+        description="أنشئ الموعد في خطوات واضحة: العميل، ثم الخدمة، ثم التاريخ."
       />
-      <div className="rounded-xl border bg-card p-5 shadow-xs sm:p-6">
-        <CreateAppointmentForm
-          customers={options.customers}
-          services={options.services}
+      <div className="rounded-xl border bg-card p-4 shadow-xs sm:p-6">
+        <SmartCreateAppointment
+          initialCustomers={
+            customerResult.success ? customerResult.customers : []
+          }
+          services={Array.isArray(serviceResult) ? serviceResult : []}
           defaultDate={defaultDate}
+          today={todayInTimezone(business.timezone)}
+          canManageServices={role === "ADMIN"}
         />
       </div>
     </div>

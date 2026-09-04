@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-10 (Smart Availability Foundation).
+> Last updated: PROMPT-11 (Smart Create Appointment Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -2573,6 +2573,273 @@ foundation`; `package.json` version bumped to 0.9.0 (MINOR — new
 
 ---
 
+## PROMPT-11 — Smart Create Appointment Foundation (Steps 1–3)
+
+**Status:** ✅ Complete
+
+> Operator prompt: SMART CREATE APPOINTMENT — BOOKING FLOW FOUNDATION
+> (STEPS 1–3). Replaces the single-form Create Appointment experience
+> with the first three steps of the intended 6-step flow (العميل →
+> الخدمة → التاريخ → الوقت → المراجعة → التأكيد), entered from the
+> existing "Create Appointment" actions. Steps 4–6 are OUT OF SCOPE and
+> remain locked in the UI. Zero schema changes; the PROMPT-10
+> availability layer is untouched and still unconsumed by UI.
+
+### PLAN
+
+1. Keep the route `/appointments/new` (every existing entry point —
+   dashboard quick action, agenda header + empty state, GettingStarted
+   card, `?create=true` redirect — keeps working unchanged).
+2. One actor-based booking-flow read service (tenant-scoped customer
+   search reusing the EXISTING `CustomerRepository.listByBusiness`
+   search primitive; active-services list reusing the existing service
+   repository filter) + one thin `"use server"` search action
+   (availability-actions pattern).
+3. A client wizard holding ONLY `{customerId, serviceId, date}` + the
+   current screen — no global store, no URL step state; TanStack Query
+   (already wired app-wide) for the debounced customer search.
+4. A 6-step progress indicator with only steps 1–3 active; completed
+   steps clickable for safe back-navigation (onboarding convention).
+5. An INTERIM details screen (time + note + create) reusing the existing
+   `createAppointment` action so the appointment-creation capability is
+   PRESERVED (it must not regress while steps 4–6 do not exist yet);
+   PROMPT-12 replaces it with available-slot selection.
+6. Verify via a temporary offline harness (in-memory repository
+   stand-ins running the REAL service + schemas + source-level checks),
+   then the full quality gates; update docs; commit/tag/publish.
+
+### TODO Completion
+
+- [x] Read Tier 0 + task-relevant docs (vision, strategy, architecture,
+      SPEC_A, roadmap, decisions, build state, design system, UX plan,
+      database, current state, project status)
+- [x] Inspect the current create-appointment implementation + the
+      PROMPT-10 availability layer (reused, NOT rebuilt)
+- [x] Booking-flow types + 6-step constants (`BOOKING_FLOW_STEPS`,
+      `BOOKING_FLOW_ACTIVE_STEPS = 3`)
+- [x] Booking-flow schemas (customer search `{query}` only; interim
+      details form startTime + notes)
+- [x] `booking-flow-service.ts` — `searchBookingCustomers` +
+      `listBookingServices` (actor + injectable deps, typed Arabic
+      results)
+- [x] `searchBookingCustomersAction` thin server action
+- [x] `use-debounced-value` feature-local hook (onboarding hooks
+      pattern)
+- [x] Smart-create components: progress indicator, customer step, date
+      helpers, service step, date step, interim details step, wizard
+      container
+- [x] Page rewrite + layout-matched loading skeleton; old
+      `create-appointment-form.tsx` + `getAppointmentFormOptions`
+      removed (superseded, not reused elsewhere)
+- [x] Temporary verification harness (60/60 checks) — created, run,
+      removed
+- [x] Quality gates: db:generate / verify (lint + typecheck + format +
+      build --webpack) / security
+- [x] Docs: appointments README / BUILD_STATE / CURRENT_STATE /
+      PROJECT_STATUS; version → 0.10.0
+- [x] Release: commit + annotated tag v0.10.0 + push + GitHub Release
+
+### ALREADY PRESENT / REUSED (untouched in spirit)
+
+- `CustomerRepository.listByBusiness(businessId, { search })` — the
+  existing name-OR-phone contains search (same primitive the
+  conversations inbox uses); NO new repository read was needed
+- `ServiceRepository.listByBusiness` active-only filter — the same
+  rule every booking path enforces (inactive services not selectable)
+- `createAppointment` server action (conflict check, tenant checks,
+  server-derived initial status from `Business.confirmationMode`) —
+  reused VERBATIM by the interim details screen
+- Shared `appointmentDateSchema` (format + calendar validity) — reused
+  for the date step + the `?date=` param
+- `todayInTimezone` business-timezone semantics — reused for today +
+  the native date input's `min`
+- Guards (`requireUser`), PageHeader, EmptyState, SearchInput,
+  StatusBadge-style card patterns, radio-cards (settings pattern),
+  onboarding-shell progress-indicator conventions, page-skeleton
+- TanStack Query provider (app-wide since Prompt 01) — the customer
+  search is its first consumer (debounced query key, cached, retry 1)
+- PROMPT-10 availability layer — untouched; NOT consumed by steps 1–3
+  (by scope; step 4 in the next prompt consumes it)
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **Booking-flow read service** (`server/booking-flow-service.ts`):
+  `searchBookingCustomers(deps, actor, {query})` — Zod-stripped input
+  (hostile `businessId`/`role` keys never pass), actor's Business only,
+  empty query → most recent customers (page size 20), repository
+  failures typed Arabic without internals; `listBookingServices(deps,
+actor)` — active services only. ADMIN and STAFF both allowed
+  (booking is a business operation, same as availability/create).
+  Repository collaborators injectable (established pattern).
+- **Search action** (`actions/booking-flow-actions.ts`): thin
+  `"use server"` wrapper building the actor from the authenticated
+  session + DB user (least-privilege fallback when the user record is
+  gone) — the established availability-actions pattern.
+- **Smart Create wizard** (`components/smart-create/`):
+  - `booking-flow-progress.tsx` — 6-step indicator (العميل، الخدمة،
+    التاريخ، الوقت، المراجعة، التأكيد); only 1–3 active, 4–6 locked
+    (muted + lock icon + `aria-disabled`); completed steps show a check
+    and are clickable for back-navigation (`aria-current="step"` on the
+    current step).
+  - `customer-step.tsx` — Step 1: debounced search by name or phone
+    (SearchInput + `useDebouncedValue` + `useQuery` with
+    keepPreviousData, server-preloaded initial page), skeleton loading
+    state, actionable empty states (no customers at all → link to
+    conversations; no matches → guidance), obvious selected-customer
+    state (check + card) with an easy تغيير, Arabic result count via
+    new `SEARCH_RESULT_NOUNS`.
+  - `service-step.tsx` — Step 2: radio-cards (settings-screen pattern)
+    of active services only, name + duration in minutes, selected state
+    obvious + changeable; actionable empty state (ADMIN → إدارة
+    الخدمات link, STAFF → guidance text).
+  - `date-step.tsx` — Step 3: quick-pick strip of the next 14 days
+    from business-timezone today (اليوم/غداً + weekday chips, month
+    shown on change, horizontally scrollable, 360px safe) + a native
+    date input (min = business today) for any other date; validation
+    through the shared `appointmentDateSchema`; selected date echoed
+    long-form; NO availability calculation.
+  - `booking-details-step.tsx` — INTERIM completion screen (NOT one of
+    the 6 steps): selections summary (customer/service/date), startTime
+    - notes RHF form (Zod, Arabic messages, end-time hint), reusing the
+      existing `createAppointment` action; success redirects to the
+      appointment detail (existing behavior).
+  - `smart-create-appointment.tsx` — wizard container: the ONLY state
+    holder (`customerId`, `serviceId`, `date`, screen); back/forward
+    never resets selections; per-step continue gating (disabled until
+    customer / service / valid date); one primary action per step;
+    selections summary above steps 2–3; sr-only step-change
+    announcements.
+- **Page** (`/appointments/new`): session-guarded, Business derived
+  server-side (redirect to onboarding when missing), `?date=` param
+  validated with the shared schema, initial customers + services read
+  through the booking-flow service, `today` business-local,
+  `canManageServices` derived from the session role.
+- **Removed (superseded):** `create-appointment-form.tsx` (the
+  simplistic single form) and `getAppointmentFormOptions` (its query);
+  `AppointmentOption`/`ServiceOption` types replaced by the
+  `Booking*Option` types.
+
+### NOT IMPLEMENTED (later prompts — per scope)
+
+- **Steps 4–6**: available-slot selection (consumes
+  `getAvailabilityAction`), review, and confirmation — the next prompt
+  implements slot selection and REPLACES the interim details screen
+- Customers directory / customer creation (Spec A §11 — customers are
+  auto-created from WhatsApp; the flow honestly routes to conversations
+  when no customers exist)
+- Availability-aware rescheduling, AI, WhatsApp transport, reminders
+- No changes to the existing agenda/detail screens (functional and
+  untouched)
+
+### Generated / Changed Files
+
+`src/features/appointments/{types.ts (booking types + step constants),
+schemas/booking-flow-schema.ts, server/booking-flow-service.ts,
+actions/booking-flow-actions.ts, hooks/use-debounced-value.ts,
+components/smart-create/{smart-create-appointment,booking-flow-progress,
+customer-step,service-step,date-step,booking-details-step,date-format}
+}`; rewrote `src/app/(app)/appointments/new/{page,loading}.tsx`; removed
+`src/features/appointments/components/create-appointment-form.tsx`;
+trimmed `src/features/appointments/server/appointment-queries.ts`
+(form-options read removed); `src/lib/arabic.ts` (+`SEARCH_RESULT_NOUNS`);
+`src/features/appointments/README.md`; `package.json` (version → 0.10.0).
+No schema/migration changes.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..10 pattern): **60/60 checks passed** offline with in-memory
+  repository stand-ins running the REAL service + schemas, plus
+  source-level checks — customer search by Arabic name partial, phone
+  substring, case-insensitive Latin name; empty query → recent list
+  (page cap 20, newest first, no search filter passed); whitespace-only
+  query trimmed; hostile `{query, businessId, role}` payload stripped
+  (repository still called with the ACTOR's businessId; foreign-business
+  customers never leak); non-object / non-string / 101-char query →
+  typed Arabic rejection with ZERO repository calls; actor without
+  business → "أكمل إعداد المنشأة أولاً" with zero calls; STAFF actor
+  allowed; result items expose exactly {id, name, phone}; exactly one
+  repository call per search; repository throw → typed Arabic message
+  without internals; services list active-only (inactive + deleted +
+  foreign excluded) with {id, name, durationMinutes} shape; details
+  form rejects 25:00/9:00/2001-char notes and accepts 09:00; shared
+  date schema rejects 2026-02-30/2026-13-01/malformed; search schema
+  strips hostile keys; `BOOKING_FLOW_STEPS` exactly 6 labels in order
+  and `BOOKING_FLOW_ACTIVE_STEPS === 3`; source checks — old form +
+  form-options removed, no `@/server/db` in new files (repositories
+  stay the only Prisma consumers), no console logging, no physical
+  left/right CSS, action is a thin use-server wrapper (session + DB
+  user), page session-guarded with server-derived Business + validated
+  date param, progress indicator renders the 6 steps with current/locked
+  semantics, container owns state with per-step continue gating and NO
+  selection resets on navigation, customer step wired to the action with
+  empty/selected/change states, service step radio-cards, date step
+  validates via the shared schema with min=today, NO step component
+  references the availability layer, details step reuses
+  `createAppointment` with exactly the flow payload.
+- `pnpm db:generate` ✅
+- `pnpm verify` full gate: PASSED ✅ (lint 42.2s · typecheck 22.1s ·
+  format 35.2s · build --webpack 443.2s) — `/appointments/new` compiled
+  as a dynamic route
+- `pnpm security` ✅ (clean)
+- NOT verified on-device (environment limits, honestly stated):
+  live-database behavior of the search path and the created wizard
+  against a running server (this device has a placeholder
+  `DATABASE_URL` and cannot run the Prisma schema engine). The real-DB
+  path is the existing `CustomerRepository.listByBusiness` /
+  `ServiceRepository.listByBusiness` conventions already used by every
+  screen; the workflow logic was verified offline with the REAL service
+  code against in-memory stand-ins.
+
+### Known Limitations
+
+- Steps 4–6 are locked placeholders in the indicator — the flow
+  currently completes through the interim details screen (manual start
+  time + note), NOT slot selection. This is the deliberate bridge that
+  preserves the appointment-creation capability until the next prompt.
+- The date step's native input enforces `min = business today` as a UX
+  guard; the domain (createAppointment action) still accepts past dates
+  exactly as before — no server-side domain rule was invented or
+  changed.
+- Customer search matches stored phone strings by substring (the
+  existing repository primitive; seeded phones are stored without
+  separators). A query with different separators than stored will not
+  match — same semantics as the conversations inbox.
+- Search results cap at 20 per page (pilot scale); no pagination UI in
+  the step.
+- When the actor has zero customers, the flow cannot proceed past Step
+  1 (appointments require an existing customer — unchanged from the
+  previous form; customer creation belongs to the Customers Directory
+  prompt).
+
+### Database / Migration State
+
+- **NO schema change.** Customer, Service, and Appointment models
+  fully support the flow. Existing unapplied-on-device migrations
+  (`20260902120000`, `20260903120000`, `20260903130000`,
+  `20260903140000`) remain a desktop/CI `pnpm db:deploy` action,
+  unchanged by this prompt.
+
+### Release
+
+- Commit `feat(appointments): add smart create appointment flow
+foundation`; `package.json` version bumped to 0.10.0 (MINOR — new
+  user-facing product capability; `/api/health` reports the version).
+- Annotated tag `v0.10.0` — Smart Create Appointment Foundation —
+  points at the PROMPT-11 commit. Published through the documented
+  GitHub publication workflow (PROMPT-05A..10 pattern: git state →
+  origin identity → gh auth → push main → verify tag target → push tag
+  only → `gh release create --verify-tag` → verify release published).
+  The legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's prompt instruction.
+- **Next step (product):** PROMPT-12 — Smart Create Appointment:
+  Available-Slot Selection (Step 4) — consumes the PROMPT-10
+  availability layer through `getAvailabilityAction` and REPLACES the
+  interim details screen. Do NOT implement it in this prompt.
+
+---
+
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
   to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
   العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
@@ -2721,10 +2988,26 @@ password}` input and typed Arabic error mapping, safe sign-in →
   error codes; `getAvailabilityAction` is the thin server-action hook
   for PROMPT-11 Smart Create. Zero schema changes, no UI, verified
   offline 36/36 with in-memory stand-ins running the real service code.
-- **Next Step:** PROMPT-11 — Smart Create Appointment Foundation
-  (consumes the deterministic availability layer through
-  `getAvailabilityAction`). Do NOT combine unrelated areas. After that,
-  the remaining Spec A placeholders (customers directory, business
-  knowledge screen, team, staff area) proceed per the operator's
-  choice.
+- **Smart create appointment foundation (PROMPT-11) complete:** the first
+  three steps of the Smart Create flow at `/appointments/new` — العميل
+  (debounced name/phone search through the existing customer repository
+  primitive, tenant-scoped server action, empty/selected/change states),
+  الخدمة (active services only, radio-cards, actionable empty state),
+  التاريخ (14-day quick-pick strip from business-timezone today + native
+  date input with shared-schema validation, NO availability calculation) —
+  inside a 6-step progress indicator where only steps 1–3 are active and
+  completed steps are clickable for safe back-navigation. Wizard state is
+  `{customerId, serviceId, date}` in one client container (no global
+  store; TanStack Query for the search — its first consumer). The
+  appointment-creation capability is preserved through an INTERIM details
+  screen (time + note + create) reusing the existing `createAppointment`
+  action, until available-slot selection (PROMPT-12) replaces it. Zero
+  schema changes; PROMPT-10 availability layer untouched; verified offline
+  60/60 with in-memory stand-ins running the real service code.
+- **Next Step:** PROMPT-12 — Smart Create Appointment: Available-Slot
+  Selection (Step 4) — consumes the deterministic availability layer
+  through `getAvailabilityAction` and replaces the interim details
+  screen. Do NOT combine unrelated areas. After that, the remaining Spec
+  A placeholders (customers directory, business knowledge screen, team,
+  staff area) proceed per the operator's choice.
 - After each prompt: update this file and `DECISIONS.md`.

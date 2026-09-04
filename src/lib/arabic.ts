@@ -48,3 +48,11 @@ export const SERVICE_NOUNS: ArabicCountNouns = {
   few: "خدمات",
   many: "خدمة",
 };
+
+export const SEARCH_RESULT_NOUNS: ArabicCountNouns = {
+  zero: "لا توجد نتائج",
+  one: "نتيجة واحدة",
+  two: "نتيجتان",
+  few: "نتائج",
+  many: "نتيجة",
+};

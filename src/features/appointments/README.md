@@ -1,7 +1,8 @@
 # Feature: appointments
 
 Booking lifecycle: creation, confirmation, rescheduling, cancellation, reminders,
-and deterministic availability (PROMPT-10).
+deterministic availability (PROMPT-10), and the Smart Create Appointment flow
+foundation (PROMPT-11 — Steps 1–3).
 
 ## Isolation rules
 
@@ -21,16 +22,54 @@ and deterministic availability (PROMPT-10).
 - `actions/availability-actions.ts` — `getAvailabilityAction`: thin
   `"use server"` read hook for the availability service (the integration
   point for the future Smart Create flow).
+- `actions/booking-flow-actions.ts` — `searchBookingCustomersAction`: thin
+  `"use server"` wrapper for the booking-flow customer search (Step 1).
 - `schemas/appointment-schema.ts` — form-level Zod inputs for the agenda
   actions.
 - `schemas/availability-schema.ts` — availability request input
   (`{date, serviceId}` ONLY; the Business is never client-controlled —
   Zod strips every other key).
-- `server/appointment-queries.ts` — agenda/detail/form-options reads.
+- `schemas/booking-flow-schema.ts` — booking-flow inputs: customer search
+  (`{query}` ONLY — hostile keys stripped) and the interim details form
+  (startTime + notes).
+- `server/appointment-queries.ts` — agenda/detail reads.
 - `server/availability-service.ts` — deterministic availability
   calculation (see Semantics below).
-- `types.ts` — agenda/detail/option types plus the availability result
-  contract.
+- `server/booking-flow-service.ts` — Steps 1–2 reads: tenant-scoped
+  customer search (name/phone via the existing repository primitive) and
+  the active-services list.
+- `hooks/use-debounced-value.ts` — debounce for the search box.
+- `components/smart-create/*` — the Smart Create flow (see below).
+- `types.ts` — agenda/detail/option types, the availability result
+  contract, the 6-step flow constants, and booking-flow option types.
+
+## Smart Create flow (PROMPT-11 — Steps 1–3)
+
+`/appointments/new` is the Smart Create Appointment flow: العميل → الخدمة
+→ التاريخ, shown in a 6-step progress indicator where ONLY steps 1–3 are
+active (الوقت/المراجعة/التأكيد stay locked until later prompts).
+
+- **Step 1 — العميل** (`customer-step.tsx`): search by name or phone
+  (debounced, `searchBookingCustomersAction` → `searchBookingCustomers`,
+  tenant-scoped by construction), a clear no-match empty state, an obvious
+  selected-customer state, and an easy تغيير before continuing.
+- **Step 2 — الخدمة** (`service-step.tsx`): radio-cards of the Business's
+  ACTIVE services only (inactive services are never bookable), with name +
+  duration in minutes.
+- **Step 3 — التاريخ** (`date-step.tsx`): a quick-pick strip of the next 14
+  days (starting from business-timezone today, server-derived) plus a
+  native date input (min = business today). Validation reuses the shared
+  `appointmentDateSchema`. NO availability calculation happens here — the
+  next step will consume the PROMPT-10 availability layer.
+- **Wizard state** lives in `smart-create-appointment.tsx` only
+  (`customerId`/`serviceId`/`date` + current screen): moving back and forth
+  never resets selections; each step's continue action stays disabled until
+  its selection is valid; completed steps in the progress indicator are
+  clickable for safe back-navigation (onboarding-wizard convention).
+- **Interim details screen** (`booking-details-step.tsx`): NOT one of the 6
+  flow steps — the temporary completion of today's booking path (time +
+  note + create) reusing the existing `createAppointment` action, until
+  available-slot selection (step 4) lands in the next prompt.
 
 ## Availability semantics (PROMPT-10)
 

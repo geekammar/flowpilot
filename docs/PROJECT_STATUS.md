@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-10 —
-> Smart Availability Foundation).
+> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-11 —
+> Smart Create Appointment Foundation, Steps 1–3).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -32,6 +32,8 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Services management (PROMPT-08)                              | ✅ complete                            |
 | Business settings — identity + booking behavior (PROMPT-09)  | ✅ complete                            |
 | Availability domain/service foundation (PROMPT-10)           | ✅ complete (service layer, no UI)     |
+| Smart Create flow Steps 1–3 (PROMPT-11)                      | ✅ complete                            |
+| Smart Create Steps 4–6 (slot/review/confirm)                 | ⏳ next product slice                  |
 | Customers directory                                          | ⏳ placeholder (oldest remaining)      |
 | Business knowledge screen                                    | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
@@ -79,7 +81,7 @@ initial status of new appointments. Not yet implemented: default
 appointment duration (no clean domain representation — documented,
 not invented), working-hours editing in settings, account
 activate/deactivate, and the knowledge screen.
-Smart availability (PROMPT-10) is now implemented as a
+Smart availability (PROMPT-10) is implemented as a
 service/domain foundation (no UI): `getAvailability` in the
 appointments feature computes deterministic bookable start times from
 the Business's workingHours, stored timezone, canonical
@@ -88,12 +90,27 @@ by the same PENDING/CONFIRMED conflict rule the write path enforces
 (read via the new `AppointmentRepository.listBlockingForDate`
 primitive). Typed result contract with explicit no-slots reasons and
 Arabic error codes; `getAvailabilityAction` is the server-action hook
-for the future Smart Create flow (PROMPT-11). Zero schema changes;
-verified offline 36/36 with in-memory stand-ins running the real
-service code.
-Not yet implemented:
-token delivery, invitation creation UI (Team management), and the
-STAFF activation workflow.
+for the Smart Create flow. Zero schema changes; verified offline 36/36
+with in-memory stand-ins running the real service code.
+Smart Create Appointment Steps 1–3 (PROMPT-11) are now implemented:
+`/appointments/new` is a step flow (العميل → الخدمة → التاريخ) with a
+6-step progress indicator where only steps 1–3 are active. Step 1
+searches customers by name or phone (debounced, tenant-scoped server
+action over the existing customer repository search primitive, with
+empty/selected/change states); Step 2 lists active services only as
+radio-cards; Step 3 offers a 14-day quick-pick strip from
+business-timezone today plus a native date input validated by the
+shared date schema — NO availability calculation (Step 4 consumes the
+PROMPT-10 layer in the next prompt). Selections live in one client
+container and never reset on back-navigation; the appointment-creation
+capability is preserved through an interim details screen (time + note
+
+- create) reusing the existing `createAppointment` action until
+  available-slot selection lands. Zero schema changes; verified offline
+  60/60 with in-memory stand-ins running the real service code.
+  Not yet implemented:
+  token delivery, invitation creation UI (Team management), and the
+  STAFF activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -219,12 +236,23 @@ foundation`); the tag is pushed to origin and the GitHub Release
   (device-local, user action) and was not used, per the
   operator's instruction.
 - **v0.9.0 — Smart Availability Foundation: PUBLISHED** (2026-09-04,
-  PROMPT-10 — current Latest release). Annotated tag `v0.9.0` points
+  PROMPT-10). Annotated tag `v0.9.0` points
   at the PROMPT-10 commit (`feat(appointments): add deterministic
 availability foundation`); the tag is pushed to origin and the
   GitHub Release "FlowPilot v0.9.0 — Smart Availability Foundation"
   exists. Published through the documented GitHub publication workflow
   (PROMPT-05A..09 pattern); the legacy `pnpm release` doctor gate
+  still blocks on this device's placeholder `DATABASE_URL`
+  (device-local, user action) and was not used, per the operator's
+  instruction.
+- **v0.10.0 — Smart Create Appointment Foundation (Steps 1–3):
+  PUBLISHED** (2026-09-04, PROMPT-11 — current Latest release).
+  Annotated tag `v0.10.0` points at the PROMPT-11 commit
+  (`feat(appointments): add smart create appointment flow
+foundation`); the tag is pushed to origin and the GitHub Release
+  "FlowPilot v0.10.0 — Smart Create Appointment Foundation" exists.
+  Published through the documented GitHub publication workflow
+  (PROMPT-05A..10 pattern); the legacy `pnpm release` doctor gate
   still blocks on this device's placeholder `DATABASE_URL`
   (device-local, user action) and was not used, per the operator's
   instruction.
@@ -243,9 +271,11 @@ availability foundation`); the tag is pushed to origin and the
 
 ## Next Spec
 
-**Finish Spec A first.** Recommended next product slice: **PROMPT-11 —
-Smart Create Appointment Foundation** (consumes the PROMPT-10
-availability layer through `getAvailabilityAction`), then the remaining
+**Finish Spec A first.** Recommended next product slice: **PROMPT-12 —
+Smart Create Appointment: Available-Slot Selection (Step 4)** — consumes
+the PROMPT-10 availability layer through `getAvailabilityAction` and
+replaces the interim details screen, followed by review/confirm
+(Steps 5–6). Then the remaining
 placeholders (customers directory → business knowledge screen → team,
 which includes the STAFF invitation/activation UX composing the
 existing invitation services; then staff area). Spec A exit criteria
