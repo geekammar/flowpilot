@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-12 —
-> Smart Create Appointment: Available-Slot Selection, Step 4).
+> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-13 —
+> Smart Create Appointment: Step 5 Review).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -34,7 +34,8 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Availability domain/service foundation (PROMPT-10)           | ✅ complete (service layer, no UI)     |
 | Smart Create flow Steps 1–3 (PROMPT-11)                      | ✅ complete                            |
 | Smart Create Step 4 — available-slot selection (PROMPT-12)   | ✅ complete                            |
-| Smart Create Steps 5–6 (review/confirm)                      | ⏳ next product slice                  |
+| Smart Create Step 5 — review (PROMPT-13)                     | ✅ complete                            |
+| Smart Create Step 6 — confirmation/creation (PROMPT-14)      | ⏳ next product slice                  |
 | Customers directory                                          | ⏳ placeholder (oldest remaining)      |
 | Business knowledge screen                                    | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
@@ -114,14 +115,27 @@ the EXPLICIT reason as clear Arabic copy plus actionable next steps
 (BUSINESS_CLOSED / SERVICE_TOO_LONG / FULLY_BOOKED), and failure with
 retry. The typed `SelectedSlot` lives in the wizard's container state,
 is cleared when service or date changes, and is preserved for the
-future review step — Step 4 is SELECTION ONLY (no appointment is
-created from it; the interim manual time-entry screen was removed, so
-the flow deliberately ends at slot selection while steps 5–6 stay
-locked). Verified offline 89/89 with in-memory stand-ins running the
-real service code + source-level checks.
-Not yet implemented: Smart Create Steps 5–6 (review/confirmation),
-token delivery, invitation creation UI (Team management), and the
-STAFF activation workflow.
+review step — Step 4 is SELECTION ONLY (no appointment is
+created from it; the interim manual time-entry screen was removed).
+Verified offline 89/89 with in-memory stand-ins running the real
+service code + source-level checks. Smart Create Step 5 (PROMPT-13)
+is now implemented too: المراجعة reviews the wizard's preserved
+selections only (customer name+phone, service name+duration, long
+Arabic date, slot start AND end) with a تعديل affordance per section
+back to its own step, actionable Arabic missing-input errors (no
+invented fallbacks), and a primary action (متابعة إلى التأكيد) that
+REVALIDATES the slot on demand through the same
+`getAvailabilityAction` (one request per click; no second engine, no
+reservation): still-valid → honest verified status (Step 6 locked,
+nothing created); stale/typed failure → stay on the review, clear
+the slot via the wizard-state mechanism, Arabic explanation,
+اختيار وقت آخر action toward Step 4; transport failure → retryable
+alert. The Step 4 membership backstop now also clears vanished slots
+in the container state. Verified offline 42/42 with in-memory
+stand-ins running the real service code + source-level checks.
+Not yet implemented: Smart Create Step 6 (final confirmation /
+appointment creation — PROMPT-14), token delivery, invitation
+creation UI (Team management), and the STAFF activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -268,15 +282,26 @@ foundation`); the tag is pushed to origin and the GitHub Release
   (device-local, user action) and was not used, per the operator's
   instruction.
 - **v0.11.0 — Smart Create Appointment: Available-Slot Selection
-  (Step 4): PUBLISHED** (2026-09-04, PROMPT-12 — current Latest
-  release). Annotated tag `v0.11.0` points at the PROMPT-12 commit
+  (Step 4): PUBLISHED** (2026-09-04, PROMPT-12).
+  Annotated tag `v0.11.0` points at the PROMPT-12 commit
   (`feat(appointments): add available slot selection`); the tag is
   pushed to origin and the GitHub Release "FlowPilot v0.11.0 — Smart
   Create Appointment: Available-Slot Selection" exists. Published
-  through the documented GitHub publication workflow (PROMPT-05A..11
-  pattern); the legacy `pnpm release` doctor gate still blocks on this
-  device's placeholder `DATABASE_URL` (device-local, user action) and
-  was not used, per the operator's instruction.
+  through the documented GitHub publication workflow
+  (PROMPT-05A..11 pattern); the legacy `pnpm release`
+  doctor gate still blocks on this device's placeholder
+  `DATABASE_URL` (device-local, user action) and was not used, per the
+  operator's instruction.
+- **v0.12.0 — Smart Create Appointment: Step 5 Review: PUBLISHED**
+  (2026-09-04, PROMPT-13 — current Latest release). Annotated tag
+  `v0.12.0` points at the PROMPT-13 commit
+  (`feat(appointments): add smart create review step`); the tag is
+  pushed to origin and the GitHub Release "FlowPilot v0.12.0 — Smart
+  Create Appointment: Step 5 Review" exists. Published through the
+  documented GitHub publication workflow (PROMPT-05A..12 pattern); the
+  legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's instruction.
 - Publication history was reconciled by PROMPT-05A (operations-only):
   local `main` was already current on origin (no commit push needed);
   the three missing tags were pushed normally (no force) and the
@@ -292,10 +317,10 @@ foundation`); the tag is pushed to origin and the GitHub Release
 
 ## Next Spec
 
-**Finish Spec A first.** Recommended next product slice: **PROMPT-13 —
-Smart Create Appointment: Step 5 Review** — consumes the preserved
-`SelectedSlot` from the wizard state (then Step 6 confirmation). Then
-the remaining
+**Finish Spec A first.** Recommended next product slice: **PROMPT-14 —
+Smart Create Appointment: Step 6 Confirmation / Appointment Creation**
+— consumes the review's verified state through the untouched
+`createAppointment` write path. Then the remaining
 placeholders (customers directory → business knowledge screen → team,
 which includes the STAFF invitation/activation UX composing the
 existing invitation services; then staff area). Spec A exit criteria

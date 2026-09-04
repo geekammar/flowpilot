@@ -2,7 +2,8 @@
 
 Booking lifecycle: creation, confirmation, rescheduling, cancellation, reminders,
 deterministic availability (PROMPT-10), and the Smart Create Appointment flow
-(PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 — available-slot selection).
+(PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 — available-slot selection +
+PROMPT-13 Step 5 — review).
 
 ## Isolation rules
 
@@ -40,14 +41,14 @@ deterministic availability (PROMPT-10), and the Smart Create Appointment flow
 - `hooks/use-debounced-value.ts` — debounce for the search box.
 - `components/smart-create/*` — the Smart Create flow (see below).
 - `types.ts` — agenda/detail/option types, the availability result
-  contract, the 6-step flow constants, `SelectedSlot`, and booking-flow
-  option types.
+  contract, the 6-step flow constants, `SelectedSlot`, the review-check
+  state, and booking-flow option types.
 
-## Smart Create flow (Steps 1–4)
+## Smart Create flow (Steps 1–5)
 
 `/appointments/new` is the Smart Create Appointment flow: العميل → الخدمة
-→ التاريخ → الوقت, shown in a 6-step progress indicator where ONLY steps
-1–4 are active (المراجعة/التأكيد stay locked until later prompts).
+→ التاريخ → الوقت → المراجعة, shown in a 6-step progress indicator where
+ONLY steps 1–5 are active (التأكيد stays locked until a later prompt).
 
 - **Step 1 — العميل** (`customer-step.tsx`): search by name or phone
   (debounced, `searchBookingCustomersAction` → `searchBookingCustomers`,
@@ -75,23 +76,44 @@ deterministic availability (PROMPT-10), and the Smart Create Appointment flow
     `slot-helpers.ts` holds the pure presentation helpers (Arabic time
     formatting, period grouping, stale-selection membership check,
     timezone label) — display-only; the availability semantics live in the
-    service.
+    service. A fresh successful result that no longer contains the
+    preserved slot also clears it in the wizard state
+    (`onSlotUnavailable`), so a stale slot can never reach the review.
+- **Step 5 — المراجعة** (`review-step.tsx`, PROMPT-13): one-glance
+  review of the already-selected customer (name + phone), service (name +
+  duration from `Service.durationMinutes`), date (long Arabic form), and
+  slot (start AND end time from `SelectedSlot`). Each section carries a
+  تعديل affordance back to its own step; back-navigation never resets
+  selections. Missing required inputs are reported as actionable Arabic
+  errors with a way back to the providing step (`getMissingReviewFields`
+  — the pure derivation shared with the container's gating); no fallback
+  values are invented. The wizard footer's primary action
+  (متابعة إلى التأكيد) REVALIDATES the slot through the SAME
+  `getAvailabilityAction` (one request per click, no mount-time query,
+  no second engine, no reservation) — a stale slot clears through the
+  wizard-state mechanism and keeps the user on the review with an
+  obvious اختيار وقت آخر action; a verified slot shows an honest
+  status panel because Step 6 (التأكيد) is still locked: NO appointment
+  is ever created from Step 5.
 - **Wizard state** lives in `smart-create-appointment.tsx` only
-  (`customerId`/`serviceId`/`date`/`selectedSlot` + current screen):
-  moving back and forth never resets selections; each step's continue
-  action stays disabled until its selection is valid; completed steps in
-  the progress indicator are clickable for safe back-navigation
-  (onboarding-wizard convention). Changing the service or the date
-  CLEARS the slot selection (a slot is only valid for the inputs it was
-  computed for); changing the customer does not (availability does not
-  depend on the customer). Step 4 is SELECTION ONLY: the chosen slot is
-  preserved in wizard state for the future review step (PROMPT-13), no
-  appointment is created from it, and there is deliberately no continue
-  action past it while steps 5–6 stay locked.
+  (`customerId`/`serviceId`/`date`/`selectedSlot` + current screen +
+  the review-check state): moving back and forth never resets
+  selections; each step's continue action stays disabled until its
+  selection is valid; completed steps in the progress indicator are
+  clickable for safe back-navigation (onboarding-wizard convention).
+  Changing the service or the date CLEARS the slot selection (a slot is
+  only valid for the inputs it was computed for); changing the customer
+  does not (availability does not depend on the customer). Step 4 is
+  SELECTION ONLY and Step 5 is REVIEW ONLY — no appointment is created
+  from either; the existing `createAppointment` action remains the sole
+  write path (untouched, awaiting the Step 6 confirmation prompt).
 
 The interim manual time-entry details screen from PROMPT-11 was REMOVED
-(superseded by Step 4) — the manual start-time entry is no longer part
-of the Smart Create path.
+(superseded by Step 4) — the manual start-time entry is no longer part of
+the Smart Create path. The flow currently ends at the review step: the
+verified-review status panel states honestly that the final confirmation
+step (التأكيد) is not enabled yet, so no appointment can be created from
+the wizard until the Step 6 prompt lands.
 
 ## Availability semantics (PROMPT-10)
 

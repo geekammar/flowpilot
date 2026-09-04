@@ -11,7 +11,7 @@ import { CheckIcon, LockIcon } from "lucide-react";
 /**
  * Progress indicator for the Smart Create Appointment flow. Shows the
  * intended 6-step flow (العميل → الخدمة → التاريخ → الوقت → المراجعة
- * → التأكيد) with steps 1–4 active in this release; steps 5–6 stay
+ * → التأكيد) with steps 1–5 active in this release; step 6 stays
  * locked. Completed steps are clickable for safe back-navigation
  * (the onboarding-wizard convention) — selections are preserved.
  */
@@ -20,8 +20,8 @@ export function BookingFlowProgress({
   completedSteps,
   onSelectStep,
 }: {
-  /** 1-based index of the active step (only 1–4 are ever active). */
-  currentStep: 1 | 2 | 3 | 4;
+  /** 1-based index of the active step (only 1–5 are ever active). */
+  currentStep: 1 | 2 | 3 | 4 | 5;
   /** Which of the first four steps already hold a valid selection. */
   completedSteps: {
     customer: boolean;
@@ -40,7 +40,9 @@ export function BookingFlowProgress({
         ? completedSteps.service
         : index === 2
           ? completedSteps.date
-          : completedSteps.slot;
+          : index === 3
+            ? completedSteps.slot
+            : false;
 
   return (
     <nav aria-label="خطوات إنشاء الموعد">

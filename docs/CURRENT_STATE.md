@@ -2,8 +2,8 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-04 — PROMPT-12 (Smart Create Appointment —
-> Step 4: Available-Slot Selection).
+> Last updated: 2026-09-04 — PROMPT-13 (Smart Create Appointment —
+> Step 5: Review).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -161,13 +161,36 @@ serviceId})` answers "which start times are actually bookable?" using
   visible. The typed `SelectedSlot` lives in the wizard's container
   state, is cleared when service or date changes (customer changes do
   not — availability does not depend on it), and a
-  membership-in-current-result check is the backstop. Step 4 is
-  SELECTION ONLY — no appointment is created from it, `createAppointment`
+  membership-in-current-result check is the backstop (PROMPT-13 also
+  clears vanished slots in the container state). Step 4 is
+  SELECTION ONLY — no appointment is created from it,
+  `createAppointment`
   is never called there, and the interim manual time-entry screen was
-  removed; the flow deliberately ends at slot selection (steps 5–6
-  locked) until PROMPT-13 (review) consumes the preserved slot. Verified
+  removed; PROMPT-13 (review) now consumes the preserved slot. Verified
   offline 89/89 with in-memory stand-ins running the real service code +
   source-level checks (no live DB on this device — honestly stated).
+- **Smart create step 5 — review (PROMPT-13): ✅ implemented:** المراجعة
+  reviews the wizard's preserved selections ONLY (customer name+phone,
+  service name+duration, long Arabic date, slot start AND end time) —
+  each section with a تعديل affordance back to its own step;
+  back-navigation still never resets selections. Missing required
+  inputs (customer/service/date/slot) render as actionable Arabic
+  errors with per-field recovery actions, and the primary action
+  (متابعة إلى التأكيد) stays disabled while anything is missing — no
+  fallback values are invented. The primary action REVALIDATES the
+  selected slot on demand through the SAME `getAvailabilityAction`
+  (existing PROMPT-10 layer; one request per click; hostile keys
+  Zod-stripped; the Business stays the actor's own): still-valid →
+  honest verified status (Step 6 locked, nothing created); stale or
+  typed failure → stay on the review, clear the slot via the
+  wizard-state mechanism, Arabic explanation, obvious اختيار وقت آخر
+  action toward Step 4; transport failure → retryable alert. The Step
+  4 membership backstop now also clears vanished slots in the
+  container state, so no stale slot can reach the review. Step 6
+  (التأكيد) remains locked; `createAppointment` is untouched and never
+  called from the wizard. Verified offline 42/42 with in-memory
+  stand-ins running the real service code + source-level checks (no
+  live DB on this device — honestly stated).
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
@@ -212,14 +235,16 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   Create Appointment Foundation (Steps 1–3): published 2026-09-04
   (PROMPT-11, same workflow). v0.11.0 — Smart Create Appointment:
   Available-Slot Selection (Step 4): published 2026-09-04 (PROMPT-12,
-  same workflow) — every tag is pushed to origin and has a
+  same workflow). v0.12.0 — Smart Create Appointment: Step 5 Review:
+  published 2026-09-04 (PROMPT-13, same workflow) — every tag is
+  pushed to origin and has a
   GitHub Release; the newest tag is the current Latest. Local `main`
   and origin `main` are in sync (see `PROJECT_STATUS.md → Release
 Status`). Open user action: the repo is public but must be private
   (GITHUB_WORKFLOW.md / DECISIONS #18).
-- **Next step (product):** PROMPT-13 — Smart Create Appointment: Step 5
-  Review — consumes the preserved `SelectedSlot` from the wizard state
-  (then Step 6 confirmation). The remaining Spec A placeholders
+- **Next step (product):** PROMPT-14 — Smart Create Appointment: Step
+  6 Confirmation / Appointment Creation (the review's verified state
+  is the hand-off point). The remaining Spec A placeholders
   (customers directory, business knowledge screen, team, staff area)
   follow per the operator's choice.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

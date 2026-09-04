@@ -2,8 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-12 (Smart Create Appointment — Step 4:
-> Available-Slot Selection).
+> Last updated: PROMPT-13 (Smart Create Appointment — Step 5: Review).
 
 ## Prompt 01 — Repository Foundation
 
@@ -3080,6 +3079,240 @@ foundation`; `package.json` version bumped to 0.10.0 (MINOR — new
 
 ---
 
+## PROMPT-13 — Smart Create Appointment: Step 5 Review
+
+**Status:** ✅ Complete
+
+> Operator prompt: SMART CREATE APPOINTMENT — REVIEW STEP (STEP 5 ONLY).
+> The review step consumes the already-selected customer, service, date,
+> and `SelectedSlot` and answers "Is this the appointment I am about to
+> confirm?" with one-glance clarity. The primary action REVALIDATES the
+> slot through the EXISTING PROMPT-10 availability layer before anything
+> may leave the step — and never creates an appointment. Step 6
+> (التأكيد) remains LOCKED. Zero schema changes; the availability
+> algorithm and `createAppointment` write path untouched.
+
+### PLAN
+
+1. Extend the flow constants/types minimally:
+   `BOOKING_FLOW_ACTIVE_STEPS = 5`, screen `"review"`, and a typed
+   `ReviewCheckState` (idle/checking/failed/stale/verified) for the
+   slot-revalidation outcome.
+2. A dedicated Step 5 component (`review-step.tsx`) with a pure,
+   exported `getMissingReviewFields` derivation (§E protection) and a
+   four-section summary (customer/service/date/slot) where every
+   section carries a تعديل affordance back to its own step.
+3. Wire the wizard container: review screen state, slot → review
+   navigation, back-navigation preserving selections, and the review's
+   primary action (متابعة إلى التأكيد) performing an on-demand
+   revalidation through the EXISTING `getAvailabilityAction` — one
+   request per click, no mount-time duplicate query, no second engine,
+   no reservation.
+4. Stale-slot handling: remain on the review, clear the slot through
+   the wizard-state mechanism, show clear Arabic copy with an obvious
+   اختيار وقت آخر action back toward Step 4; extend the Step 4
+   membership backstop to clear a vanished slot in the container state
+   too (so no stale slot can reach the review summary).
+5. Keep Step 6 locked: the verified state communicates honestly that
+   the confirmation step is not enabled yet and no appointment is
+   created from this screen.
+6. Verify via a temporary offline harness (in-memory stand-ins running
+   the REAL availability service + the REAL review-state derivation +
+   source-level checks), then the full quality gates; update docs;
+   commit/tag/publish.
+
+### TODO LIST
+
+- [x] Read Tier 0 + task-relevant docs (vision, strategy, architecture,
+      SPEC_A, roadmap, decisions, build state, design system, UX plan,
+      database, current state, project status, appointments README)
+- [x] Inspect the PROMPT-11/12 wizard + the PROMPT-10 availability
+      layer (reused, NOT rebuilt — algorithm untouched)
+- [x] `types.ts`: `BOOKING_FLOW_ACTIVE_STEPS = 5`, screen `"review"`,
+      `ReviewCheckState`
+- [x] `review-step.tsx` — Step 5 review component (summary + تعديل
+      affordances + missing-state errors + stale/verified/failed
+      panels) with the pure `getMissingReviewFields`
+- [x] Wizard container: review wiring + on-demand slot revalidation +
+      check-state resets on input changes + footer primary action
+- [x] Progress indicator: steps 1–4 complete-able, step 5 active, step
+      6 locked (existing component, boundary constant only)
+- [x] Slot step: stale-slot container clear (`onSlotUnavailable`) +
+      confirmation-panel copy updated for the now-active review step
+- [x] Page copy (description mentions المراجعة); version → 0.12.0
+- [x] Temporary verification harness (42/42 checks) — created, run,
+      removed
+- [x] Quality gates: db:generate / lint / typecheck / format:check /
+      verify / security
+- [x] Docs: appointments README / BUILD_STATE / CURRENT_STATE /
+      PROJECT_STATUS
+- [x] Release: commit + annotated tag v0.12.0 + push + GitHub Release
+
+### IMPLEMENTED
+
+- **`review-step.tsx` (Step 5 — المراجعة)**: a one-glance summary of
+  the wizard's existing selections ONLY — customer (name + phone),
+  service (name + duration from `Service.durationMinutes`), date (long
+  Arabic form), and slot (start AND end time from `SelectedSlot`;
+  end is derivable by contract). No duplicate domain fields, no
+  invented values, no notes section (notes are not part of the wizard
+  state — see NOT IMPLEMENTED). Each section is a semantic
+  `section[aria-label]` with a native-button تعديل affordance back to
+  steps 1/2/3/4 respectively; back-navigation never resets selections
+  (container rule, unchanged).
+- **§E protection — `getMissingReviewFields`**: one pure derivation
+  (exported, reused by the container's gating) reporting missing
+  customer / service / date (absent OR calendar-invalid) / slot as
+  actionable Arabic errors, each with its own "go fix it" action to
+  the providing step. The review's primary action is disabled while
+  anything is missing — navigation toward Step 6 with an incomplete
+  review state is impossible by construction.
+- **Primary action — متابعة إلى التأكيد (wizard footer)**: performs the
+  smallest architecture-consistent revalidation — one on-demand call to
+  the EXISTING `getAvailabilityAction({date, serviceId})` (the same
+  PROMPT-10 layer Step 4 uses; Zod-strips hostile keys; the Business
+  stays the authenticated actor's own). Loading state: spinner +
+  disabled button + sr-only `role="status"` announcement. Outcomes:
+  - slot still bookable → `verified`: an honest `role="status"` panel
+    ("الوقت المحدد ما زال متاحاً… خطوة التأكيد النهائي غير مفعّلة بعد —
+    لن يُنشأ الموعد من هذه الشاشة") — NO navigation (Step 6 is
+    locked), NO appointment;
+  - slot gone / typed failure (service deactivated etc.) → `stale`:
+    stay on the review, CLEAR the slot via the wizard-state mechanism
+    (`setSelectedSlot(null)`), show `role="alert"` Arabic copy (the
+    typed service message when the revalidation failed with one), and
+    an obvious اختيار وقت آخر action toward Step 4;
+  - transport failure → `failed`: `role="alert"` retry guidance, the
+    button re-enables (retry = click again).
+- **Review-check state hygiene**: the check resets to idle ONLY when
+  the revalidated inputs change (service change, date change, slot
+  selection, slot-unavailable) — never on navigation.
+- **Step 4 backstop extension**: `slot-step.tsx` now clears the
+  container's preserved slot (`onSlotUnavailable`) when a fresh
+  successful availability result no longer contains it (someone booked
+  it meanwhile) — previously the membership guard only hid it visually.
+  A stale slot can no longer enable the Step 4 continue action or
+  reach the review summary. The Step 4 confirmation-panel copy now
+  points to the (real) review step instead of claiming it is locked.
+- **Progress indicator**: steps 1–4 show completion and stay clickable
+  for back-navigation; step 5 renders active with `aria-current`;
+  step 6 stays locked (`aria-disabled` + lock icon) via the shared
+  `BOOKING_FLOW_ACTIVE_STEPS = 5` boundary. One progress system,
+  unchanged component.
+- **Boundary guarantees**: no smart-create file imports or calls
+  `createAppointment`; no confirm screen exists in the screen union;
+  `setScreen` never targets anything beyond the five active screens;
+  the server page keeps the session guard + server-derived Business.
+
+### NOT IMPLEMENTED (later prompts — per scope)
+
+- **Step 6 — التأكيد (final confirmation / appointment creation)**:
+  the review's verified state deliberately does NOT navigate or
+  create; `createAppointment` remains the untouched write path for the
+  PROMPT-14 prompt. Whether a notes/details entry belongs to the
+  confirmation step is that prompt's decision (notes are not in the
+  wizard state today — nothing was invented here).
+- Reminder messages, WhatsApp booking, AI booking, customer creation,
+  customers directory, rescheduling UX, cancellation UX, agenda
+  redesign, team management, staff activation, new availability
+  algorithms, slot reservation/locking — all out of scope.
+
+### VERIFICATION
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..12 pattern): **42/42 checks passed** offline with
+  in-memory repository stand-ins running the REAL availability service
+  - the REAL `getMissingReviewFields`/`slotExistsIn` code, plus
+    source-level checks — all 18 required categories: (1) complete valid
+    review state → no missing fields; (2) missing customer / (3)
+    service / (4) date (null AND calendar-invalid) / (5) slot each
+    reported with Arabic messages + their own step actions, all-missing
+    reports all four with no invented fallbacks; (6) back/forward +
+    progress-indicator navigation never resets selections (source);
+    (7) slot remains valid → fresh availability contains it +
+    deterministic repeat; (8) stale slot rejected via the exact
+    container expression, fully-booked day and mid-flow
+    service-deactivation also reject; (9) stale revalidation clears the
+    slot through the wizard-state mechanism + the Step 4 membership
+    backstop clears vanished slots in container state; (10) the stale
+    panel provides the obvious اختيار وقت آخر action toward Step 4;
+    (11) no smart-create file imports/calls `createAppointment`, the
+    primary action only revalidates; (12) `BOOKING_FLOW_ACTIVE_STEPS ===
+5`, no confirm screen in the union, progress locks past the
+    boundary, `aria-current` on the active step; (13) hostile
+    `businessId` payload key stripped — the business resolves from the
+    ACTOR only (call-log verified); (14) hostile `role` payload key
+    never reaches the actor; (15) cross-tenant service →
+    SERVICE_NOT_FOUND, foreign blocking appointments never affect the
+    actor's slots, no foreign tenant identifiers in the result,
+    soft-deleted service not found; (16) 360px-safe layout (stacked
+    sections, no dense grids, no wide fixed widths, flex-wrap); (17)
+    keyboard accessibility (native buttons only, no clickable divs,
+    aria-labels on edit affordances, role=alert/status panels,
+    aria-live checking announcement, visible loading state); (18) no
+    physical left/right CSS in any changed smart-create file. Plus:
+    the review summary renders start AND end time + service duration
+    from existing domain fields; every section exposes تعديل; the
+    primary action is disabled while the review state is incomplete;
+    the server page keeps the session guard + server-derived Business.
+- `pnpm db:generate` ✅ · `pnpm lint` ✅ · `pnpm typecheck` ✅ ·
+  `pnpm format:check` ✅
+- `pnpm verify` full gate: PASSED ✅ (lint 41.0s · typecheck 18.8s ·
+  format 28.8s · build --webpack 280.6s) — `/appointments/new`
+  compiled as a dynamic route
+- `pnpm security` ✅ (clean)
+- NOT verified on-device (environment limits, honestly stated):
+  live-database behavior of the revalidation call through the running
+  wizard (this device has a placeholder `DATABASE_URL` and cannot run
+  the Prisma schema engine). The real-DB path is the existing
+  `getAvailability` → `AppointmentRepository.listBlockingForDate`
+  conventions already used by Step 4; the workflow logic was verified
+  offline with the REAL service code against in-memory stand-ins.
+
+### KNOWN LIMITATIONS
+
+- The Smart Create flow ends at the review step: the verified state
+  communicates honestly that Step 6 (التأكيد) is not enabled yet, so
+  no appointment can be created from the wizard until PROMPT-14 lands.
+- Revalidation is a read, not a reservation (unchanged PROMPT-10
+  caveat): a slot verified on the review can still be taken by a
+  concurrent booking; the Step 6 write path's transactional conflict
+  check remains the final guard.
+- The review shows no notes/details field — the wizard state carries
+  none and the prompt forbade inventing duplicate domain fields for
+  presentation. Notes entry (if desired) belongs to the Step 6
+  confirmation prompt's scope decision.
+- Re-running the primary action after `verified` re-checks the slot
+  (harmless, one request per click); there is deliberately no
+  auto-polling.
+
+### Database / Migration State
+
+- **NO schema change.** The existing Business/Service/Customer/
+  Appointment models fully support the review step. Existing
+  unapplied-on-device migrations (`202609021200`, `202609031200`,
+  `202609031300`, `202609031400`) remain a desktop/CI `pnpm db:deploy`
+  action, unchanged by this prompt.
+
+### Release
+
+- Commit `feat(appointments): add smart create review step`;
+  `package.json` version bumped to 0.12.0 (MINOR — new user-facing
+  product capability; `/api/health` reports the version).
+- Annotated tag `v0.12.0` — Smart Create Appointment: Step 5 Review —
+  points at the PROMPT-13 commit. Published through the documented
+  GitHub publication workflow (PROMPT-05A..12 pattern: git state →
+  origin identity → gh auth → push main → verify tag target → push tag
+  only → `gh release create --verify-tag` → verify release published).
+  The legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's prompt instruction.
+- **Next step (product):** PROMPT-14 — Smart Create Appointment: Step
+  6 Confirmation / Appointment Creation. Do NOT implement it in this
+  prompt.
+
+---
+
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
   to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
   العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
@@ -3260,9 +3493,29 @@ password}` input and typed Arabic error mapping, safe sign-in →
   until PROMPT-13 (review) consumes the preserved slot. Steps 5–6 remain
   locked. Zero schema changes; verified offline 89/89 with in-memory
   stand-ins running the real service code + source-level checks.
-- **Next Step:** PROMPT-13 — Smart Create Appointment: Step 5 Review —
-  consumes the preserved `SelectedSlot` from the wizard state (then Step
-  6 confirmation). Do NOT combine unrelated areas. After that, the
-  remaining Spec A placeholders (customers directory, business knowledge
-  screen, team, staff area) proceed per the operator's choice.
+- **Smart create step 5 — review (PROMPT-13) complete:** المراجعة is now
+  a real review step consuming the wizard's preserved selections only —
+  customer (name + phone), service (name + duration), date (long Arabic
+  form), and slot (start AND end) — each section with a تعديل
+  affordance back to its own step, missing-input protection as
+  actionable Arabic errors with per-field recovery actions, and NO
+  invented fallback values or notes field. The primary action
+  (متابعة إلى التأكيد) REVALIDATES the slot on demand through the
+  existing `getAvailabilityAction` (one request per click, no
+  mount-time duplicate query, no second engine, no reservation):
+  still-valid → honest verified status (Step 6 locked — nothing is
+  created); stale/typed failure → stay on the review, clear the slot
+  through the wizard-state mechanism, clear Arabic explanation, obvious
+  اختيار وقت آخر action toward Step 4; transport failure → retryable
+  alert. The Step 4 membership backstop now also clears vanished slots
+  in the container state. Steps 5 active / 6 locked via
+  `BOOKING_FLOW_ACTIVE_STEPS = 5`. Zero schema changes; verified
+  offline 42/42 with in-memory stand-ins running the real service code
+  - source-level checks.
+- **Next Step:** PROMPT-14 — Smart Create Appointment: Step 6
+  Confirmation / Appointment Creation (the review's verified state is
+  the hand-off point; `createAppointment` remains the untouched write
+  path). Do NOT combine unrelated areas. After that, the remaining
+  Spec A placeholders (customers directory, business knowledge screen,
+  team, staff area) proceed per the operator's choice.
 - After each prompt: update this file and `DECISIONS.md`.

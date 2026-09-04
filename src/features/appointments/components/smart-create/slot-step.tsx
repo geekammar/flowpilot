@@ -26,6 +26,7 @@ import {
   CheckCircle2Icon,
   HourglassIcon,
 } from "lucide-react";
+import { useEffect } from "react";
 
 /** Copy for the explicit no-slots reasons from the availability layer. */
 const NO_SLOTS_CONTENT = {
@@ -63,6 +64,7 @@ export function SlotStep({
   date,
   selectedSlot,
   onSelectSlot,
+  onSlotUnavailable,
   onGoToDate,
   onGoToService,
 }: {
@@ -71,6 +73,10 @@ export function SlotStep({
   date: string;
   selectedSlot: SelectedSlot | null;
   onSelectSlot: (slot: SelectedSlot) => void;
+  /** Called when the fresh server result no longer contains the
+   * preserved slot — the wizard clears it through its own mechanism so
+   * no stale slot can reach the review step. */
+  onSlotUnavailable: () => void;
   onGoToDate: () => void;
   onGoToService: () => void;
 }) {
@@ -112,6 +118,19 @@ export function SlotStep({
   // or date changes; membership in the CURRENT result is the backstop.
   const currentSlot =
     slots && slotExistsIn(selectedSlot, slots) ? selectedSlot : null;
+
+  // A fresh successful result that lost the preserved slot (booked by
+  // someone else meanwhile) clears it in the wizard's own state too —
+  // otherwise a stale slot could survive into the review summary.
+  useEffect(() => {
+    if (
+      result?.success &&
+      selectedSlot &&
+      !slotExistsIn(selectedSlot, result.data.slots)
+    ) {
+      onSlotUnavailable();
+    }
+  }, [result, selectedSlot, onSlotUnavailable]);
 
   return (
     <div className="space-y-5">
@@ -239,8 +258,7 @@ export function SlotStep({
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                أكملت اختيار تفاصيل الموعد. خطوتا المراجعة والتأكيد غير مفعّلتين
-                بعد.
+                تابع إلى المراجعة للتأكد من تفاصيل الموعد قبل التأكيد.
               </p>
             </div>
           ) : null}

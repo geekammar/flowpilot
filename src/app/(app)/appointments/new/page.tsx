@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 
 /**
  * Smart Create Appointment flow (PROMPT-11 Steps 1–3 + PROMPT-12
- * Step 4). The Business is derived from the authenticated session
- * (never client input), the initial customers + active services are
- * read through the booking-flow service (tenant-scoped), and `today`
- * is business-local.
+ * Step 4 + PROMPT-13 Step 5). The Business is derived from the
+ * authenticated session (never client input), the initial customers +
+ * active services are read through the booking-flow service
+ * (tenant-scoped), and `today` is business-local.
  */
 export default async function NewAppointmentPage({
   searchParams,
@@ -58,7 +58,7 @@ export default async function NewAppointmentPage({
     <div className="animate-fade-in-up space-y-6">
       <PageHeader
         title="إنشاء موعد"
-        description="أنشئ الموعد في خطوات واضحة: العميل، ثم الخدمة، ثم التاريخ، ثم الوقت المتاح."
+        description="أنشئ الموعد في خطوات واضحة: العميل، ثم الخدمة، ثم التاريخ، ثم الوقت المتاح، ثم مراجعة التفاصيل."
       />
       <div className="rounded-xl border bg-card p-4 shadow-xs sm:p-6">
         <SmartCreateAppointment

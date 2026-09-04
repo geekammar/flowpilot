@@ -20,12 +20,14 @@ export type AppointmentActionResult =
   | { success: false; message: string };
 
 /**
- * Smart Create Appointment flow (PROMPT-11 Steps 1–3 + PROMPT-12 Step 4).
+ * Smart Create Appointment flow (PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 +
+ * PROMPT-13 Step 5).
  *
  * The intended flow is 6 steps — العميل → الخدمة → التاريخ → الوقت →
- * المراجعة → التأكيد — with the first 4 implemented; steps 5–6 stay
- * locked in the UI. `BOOKING_FLOW_ACTIVE_STEPS` marks the boundary so
- * the progress indicator (and tests) share one source of truth.
+ * المراجعة → التأكيد — with the first 5 implemented; step 6 (final
+ * confirmation) stays locked in the UI. `BOOKING_FLOW_ACTIVE_STEPS`
+ * marks the boundary so the progress indicator (and tests) share one
+ * source of truth.
  */
 export const BOOKING_FLOW_STEPS = [
   { label: "العميل" },
@@ -36,16 +38,31 @@ export const BOOKING_FLOW_STEPS = [
   { label: "التأكيد" },
 ] as const;
 
-export const BOOKING_FLOW_ACTIVE_STEPS = 4 as const;
+export const BOOKING_FLOW_ACTIVE_STEPS = 5 as const;
 
-/** Wizard screen — one per ACTIVE flow step (steps 5–6 remain locked). */
-export type BookingFlowScreen = "customer" | "service" | "date" | "slot";
+/** Wizard screen — one per ACTIVE flow step (step 6 remains locked). */
+export type BookingFlowScreen =
+  "customer" | "service" | "date" | "slot" | "review";
 
 /**
- * Step 4 (الوقت) selection — the typed value handed to the future
- * review/confirmation steps (PROMPT-13+). It mirrors the appointment
- * domain's wall-clock conventions exactly: business-local "HH:mm"
- * start/end, start + `Service.durationMinutes`.
+ * Step 5 (المراجعة) slot-revalidation state. The review's primary
+ * action re-checks the selected slot through the EXISTING availability
+ * layer before anything else may happen; "verified" never creates an
+ * appointment (step 6 stays locked — the state only records that the
+ * reviewed slot is still bookable).
+ */
+export type ReviewCheckState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "failed" }
+  | { status: "stale"; message: string }
+  | { status: "verified" };
+
+/**
+ * Step 4 (الوقت) selection — the typed value handed to the review step
+ * (PROMPT-13) and the future confirmation step. It mirrors the
+ * appointment domain's wall-clock conventions exactly: business-local
+ * "HH:mm" start/end, start + `Service.durationMinutes`.
  */
 export type SelectedSlot = AvailabilitySlot;
 
