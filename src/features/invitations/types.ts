@@ -69,13 +69,14 @@ export type GetInvitationByTokenSuccess = {
 };
 
 /**
- * Safe activation result (PROMPT-05): the activated membership context
- * only. `identityCreated` distinguishes a freshly created Better Auth
- * identity from linking an existing one (interrupted-activation resume
- * / never-assigned identity) — never a session token, never the raw
- * token, never the hash, never the password.
+ * Safe activation result (PROMPT-05; STAFF generalized in PROMPT-16):
+ * the activated membership context only. `identityCreated`
+ * distinguishes a freshly created Better Auth identity from linking an
+ * existing one (interrupted-activation resume / never-assigned
+ * identity) — never a session token, never the raw token, never the
+ * hash, never the password.
  */
-export type ActivateAdminAccountSuccess = {
+export type ActivateInvitedAccountSuccess = {
   invitation: InvitationView;
   userId: string;
   identityCreated: boolean;
@@ -91,7 +92,6 @@ export type InvitationErrorCode =
   | "INVITATION_EXPIRED"
   | "INVITATION_NOT_ACCEPTED"
   | "INVALID_INVITATION_STATE"
-  | "ROLE_NOT_ALLOWED"
   | "ACCOUNT_ALREADY_ACTIVATED"
   | "ACCOUNT_CONFLICT"
   | "IDENTITY_CREATION_FAILED"
@@ -106,13 +106,22 @@ export type InvitationServiceResult<TData> =
   | { success: false; error: { code: InvitationErrorCode; message: string } };
 
 /**
- * Safe post-submission handoff target after successful ADMIN activation
- * (PROMPT-06): the service intentionally discards the auto-created
- * session, so the activated ADMIN signs in with the password they just
- * chose and lands directly in the existing onboarding wizard. The
- * sign-in form only honors safe internal redirect paths.
+ * Safe post-submission handoff target after successful ADMIN
+ * activation (PROMPT-06): the service intentionally discards the
+ * auto-created session, so the activated ADMIN signs in with the
+ * password they just chose and lands directly in the existing
+ * onboarding wizard. The sign-in form only honors safe internal
+ * redirect paths.
  */
 export const ACTIVATION_SIGNIN_HANDOFF = "/sign-in?redirect=/onboarding";
+
+/**
+ * Safe post-submission handoff target after successful STAFF
+ * activation (PROMPT-16): the staff member signs in with the password
+ * they just chose and lands in the authenticated app. Onboarding is
+ * ADMIN-only — a staff handoff must never target it.
+ */
+export const STAFF_ACTIVATION_SIGNIN_HANDOFF = "/sign-in";
 
 /**
  * Terminal UI states for the activation screen. Each maps to one safe
@@ -124,17 +133,45 @@ export type ActivationNoticeState =
   | "EXPIRED"
   | "REVOKED"
   | "ALREADY_ACTIVATED"
-  | "ROLE_NOT_ALLOWED"
   | "CONFLICT"
   | "FAILED";
 
 /**
  * Result of the activation server action. `VALIDATION_ERROR` keeps the
  * form on screen with an inline message; `NOTICE` replaces it with a
- * terminal panel; `SUCCESS` shows the sign-in handoff. Never carries
- * the raw token, the hash, or the password.
+ * terminal panel; `SUCCESS` shows the role-aware sign-in handoff.
+ * Never carries the raw token, the hash, or the password.
  */
 export type ActivationActionResult =
-  | { status: "SUCCESS"; email: string }
+  | { status: "SUCCESS"; email: string; role: UserRole }
   | { status: "VALIDATION_ERROR"; message: string }
   | { status: "NOTICE"; state: ActivationNoticeState; message: string };
+
+/**
+ * Typed failure codes for the STAFF invitation creation flow (the
+ * team-management add-staff path). Codes mirror the underlying
+ * invitation-service errors; FORBIDDEN/NO_BUSINESS come from the
+ * actor guard (ADMIN-only, session-derived Business).
+ */
+export type CreateStaffInvitationErrorCode =
+  | "FORBIDDEN"
+  | "NO_BUSINESS"
+  | "INVALID_INPUT"
+  | "INVITATION_ALREADY_OPEN"
+  | "BUSINESS_NOT_FOUND"
+  | "PERSISTENCE_FAILED";
+
+export type CreateStaffInvitationResult =
+  | {
+      success: true;
+      invitation: InvitationView;
+      /** The deliverable credential — returned exactly once, never persisted. */
+      rawToken: string;
+    }
+  | {
+      success: false;
+      error: {
+        code: CreateStaffInvitationErrorCode;
+        message: string;
+      };
+    };

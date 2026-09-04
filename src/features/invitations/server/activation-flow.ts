@@ -1,26 +1,28 @@
 import { activateAdminAccountInputSchema } from "@/features/invitations/schemas/invitation-schema";
 import {
   acceptInvitation,
-  activateAdminAccount,
+  activateInvitedAccount,
 } from "@/features/invitations/server/invitation-service";
 import type {
   AcceptInvitationSuccess,
-  ActivateAdminAccountSuccess,
+  ActivateInvitedAccountSuccess,
   ActivationActionResult,
   InvitationErrorCode,
   InvitationServiceResult,
 } from "@/features/invitations/types";
 
 /**
- * Route-layer composition for the ADMIN activation screen (PROMPT-06):
- * composes the EXISTING acceptance and activation service operations —
- * no invitation lifecycle logic is duplicated here.
+ * Route-layer composition for the account activation screen (PROMPT-06
+ * ADMIN; generalized to both Business roles in PROMPT-16): composes
+ * the EXISTING acceptance and activation service operations — no
+ * invitation lifecycle logic is duplicated here.
  *
  * Flow: validate with the existing activation schema → accept the
  * invitation (a `INVITATION_ALREADY_ACCEPTED` result is not an error
  * here: it is the resume path of an accepted-but-unactivated
- * invitation, including interrupted activations) → activate the ADMIN
- * account → map the typed service errors to safe Arabic UI states.
+ * invitation, including interrupted activations) → activate the
+ * invited account (the persisted invitation's own role drives the
+ * membership) → map the typed service errors to safe Arabic UI states.
  *
  * Security properties (inherited from the services):
  * - Token-scoped: the persisted invitation is the sole authority for
@@ -31,18 +33,18 @@ import type {
  */
 
 /** Narrow service surface the composition depends on (injectable). */
-export type AdminActivationFlowDeps = Readonly<{
+export type InvitedActivationFlowDeps = Readonly<{
   accept: (
     input: unknown,
   ) => Promise<InvitationServiceResult<AcceptInvitationSuccess>>;
   activate: (
     input: unknown,
-  ) => Promise<InvitationServiceResult<ActivateAdminAccountSuccess>>;
+  ) => Promise<InvitationServiceResult<ActivateInvitedAccountSuccess>>;
 }>;
 
-const defaultDeps: AdminActivationFlowDeps = {
+const defaultDeps: InvitedActivationFlowDeps = {
   accept: acceptInvitation,
-  activate: activateAdminAccount,
+  activate: activateInvitedAccount,
 };
 
 /**
@@ -77,12 +79,6 @@ function toNotice(error: {
         state: "ALREADY_ACTIVATED",
         message: "تم تفعيل هذا الحساب بالفعل",
       };
-    case "ROLE_NOT_ALLOWED":
-      return {
-        status: "NOTICE",
-        state: "ROLE_NOT_ALLOWED",
-        message: error.message,
-      };
     case "ACCOUNT_CONFLICT":
       return { status: "NOTICE", state: "CONFLICT", message: error.message };
     default:
@@ -91,13 +87,15 @@ function toNotice(error: {
 }
 
 /**
- * Completes ADMIN activation in one submission: accept (resumable) →
- * activate. Returns the safe UI result consumed by the activation
- * screen — `SUCCESS` hands off to the sign-in → onboarding flow.
+ * Completes invited-account activation in one submission: accept
+ * (resumable) → activate. Returns the safe UI result consumed by the
+ * activation screen — `SUCCESS` carries the activated role so the
+ * handoff is role-aware (ADMIN → sign-in → onboarding; STAFF → plain
+ * sign-in).
  */
-export async function completeAdminActivation(
+export async function completeInvitedActivation(
   input: unknown,
-  deps: AdminActivationFlowDeps = defaultDeps,
+  deps: InvitedActivationFlowDeps = defaultDeps,
 ): Promise<ActivationActionResult> {
   const parsed = activateAdminAccountInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -124,5 +122,9 @@ export async function completeAdminActivation(
     return toNotice(activated.error);
   }
 
-  return { status: "SUCCESS", email: activated.data.invitation.email };
+  return {
+    status: "SUCCESS",
+    email: activated.data.invitation.email,
+    role: activated.data.invitation.role,
+  };
 }

@@ -11,11 +11,13 @@ export const metadata: Metadata = {
 };
 
 /**
- * Public ADMIN activation route (PROMPT-06). The invitee is not
- * authenticated — the invitation token in the path IS the credential.
- * The page performs a READ-ONLY invitation lookup (no mutation on
- * GET): acceptance + activation run atomically at submit time through
- * the server action, composing the existing invitation services.
+ * Public account activation route (PROMPT-06 ADMIN; both Business
+ * roles since PROMPT-16 — the persisted invitation's own role drives
+ * the membership). The invitee is not authenticated — the invitation
+ * token in the path IS the credential. The page performs a READ-ONLY
+ * invitation lookup (no mutation on GET): acceptance + activation run
+ * atomically at submit time through the server action, composing the
+ * existing invitation services.
  */
 export default async function InviteActivationPage({
   params,
@@ -43,52 +45,57 @@ export default async function InviteActivationPage({
   const { invitation, status, businessName } = result.data;
 
   let content: React.ReactNode;
-  if (invitation.role !== "ADMIN") {
-    // STAFF invitations are not activatable here — the staff
-    // activation workflow is a later, separate prompt.
-    content = <ActivationNotice state="ROLE_NOT_ALLOWED" />;
-  } else {
-    switch (status) {
-      case "REVOKED":
-        content = <ActivationNotice state="REVOKED" />;
-        break;
-      case "EXPIRED":
-        content = <ActivationNotice state="EXPIRED" />;
-        break;
-      case "ACTIVATED":
-        content = <ActivationNotice state="ALREADY_ACTIVATED" />;
-        break;
-      default:
-        // PENDING or ACCEPTED (not yet activated): show the form.
-        // Acceptance happens at submit time; ACCEPTED is the resume
-        // path of an interrupted activation.
-        content = (
-          <ActivationForm
-            token={token}
-            email={invitation.email}
-            businessName={businessName}
-          />
-        );
-    }
+  switch (status) {
+    case "REVOKED":
+      content = <ActivationNotice state="REVOKED" />;
+      break;
+    case "EXPIRED":
+      content = <ActivationNotice state="EXPIRED" />;
+      break;
+    case "ACTIVATED":
+      content = <ActivationNotice state="ALREADY_ACTIVATED" />;
+      break;
+    default:
+      // PENDING or ACCEPTED (not yet activated): show the form — for
+      // ADMIN and STAFF invitations alike. Acceptance happens at
+      // submit time; ACCEPTED is the resume path of an interrupted
+      // activation.
+      content = (
+        <ActivationForm
+          token={token}
+          email={invitation.email}
+          role={invitation.role}
+          businessName={businessName}
+        />
+      );
   }
 
-  return <ActivationShell showSubtitle>{content}</ActivationShell>;
+  return (
+    <ActivationShell role={invitation.role} showSubtitle>
+      {content}
+    </ActivationShell>
+  );
 }
 
 function ActivationShell({
   children,
+  role,
   showSubtitle = false,
 }: {
   children: React.ReactNode;
+  /** The invited role — required only when a subtitle is shown. */
+  role?: "ADMIN" | "STAFF";
   showSubtitle?: boolean;
 }) {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5 text-center">
         <h1 className="text-xl font-semibold tracking-tight">تفعيل الحساب</h1>
-        {showSubtitle ? (
+        {showSubtitle && role ? (
           <p className="text-muted-foreground text-sm">
-            أنشئ كلمة المرور الخاصة بك لتفعيل حسابك وبدء إعداد منشأتك.
+            {role === "ADMIN"
+              ? "أنشئ كلمة المرور الخاصة بك لتفعيل حسابك وبدء إعداد منشأتك."
+              : "أنشئ كلمة المرور الخاصة بك لتفعيل حسابك والانضمام إلى فريق العمل."}
           </p>
         ) : null}
       </div>

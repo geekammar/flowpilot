@@ -1,9 +1,12 @@
 "use client";
 
-import { activateInvitedAdminAction } from "@/features/invitations/actions/activation-actions";
+import { activateInvitedAccountAction } from "@/features/invitations/actions/activation-actions";
 import { ActivationNotice } from "@/features/invitations/components/activation-notice";
 import { activateAdminAccountInputSchema } from "@/features/invitations/schemas/invitation-schema";
-import { ACTIVATION_SIGNIN_HANDOFF } from "@/features/invitations/types";
+import {
+  ACTIVATION_SIGNIN_HANDOFF,
+  STAFF_ACTIVATION_SIGNIN_HANDOFF,
+} from "@/features/invitations/types";
 import type { ActivationActionResult } from "@/features/invitations/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,20 +22,24 @@ import Link from "next/link";
 import { useState } from "react";
 
 /**
- * ADMIN account activation form (PROMPT-06). The raw invitation token
- * travels ONLY through the hidden form field to the server action —
- * it is never displayed, logged, or persisted by this component.
- * Submission composes acceptance + activation server-side; the result
- * renders as an inline validation error, a terminal notice, or the
- * sign-in → onboarding handoff.
+ * Account activation form (PROMPT-06 ADMIN; both Business roles since
+ * PROMPT-16 — the persisted invitation's role drives the copy and the
+ * post-activation handoff). The raw invitation token travels ONLY
+ * through the hidden form field to the server action — it is never
+ * displayed, logged, or persisted by this component. Submission
+ * composes acceptance + activation server-side; the result renders as
+ * an inline validation error, a terminal notice, or the role-aware
+ * sign-in handoff.
  */
 export function ActivationForm({
   token,
   email,
+  role,
   businessName,
 }: {
   token: string;
   email: string;
+  role: "ADMIN" | "STAFF";
   businessName: string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +66,7 @@ export function ActivationForm({
     setSubmitting(true);
     let actionResult: ActivationActionResult;
     try {
-      actionResult = await activateInvitedAdminAction(parsed.data);
+      actionResult = await activateInvitedAccountAction(parsed.data);
     } catch {
       actionResult = {
         status: "NOTICE",
@@ -77,6 +84,7 @@ export function ActivationForm({
   }
 
   if (result?.status === "SUCCESS") {
+    const isAdmin = result.role === "ADMIN";
     return (
       <div
         role="status"
@@ -90,7 +98,9 @@ export function ActivationForm({
             تم تفعيل حسابك بنجاح
           </h2>
           <p className="text-muted-foreground mx-auto max-w-xs text-sm leading-6">
-            سجّل الدخول الآن بكلمة المرور التي اخترتها لإكمال إعداد منشأتك.
+            {isAdmin
+              ? "سجّل الدخول الآن بكلمة المرور التي اخترتها لإكمال إعداد منشأتك."
+              : "سجّل الدخول الآن بكلمة المرور التي اخترتها لبدء العمل مع الفريق."}
           </p>
           <p className="text-muted-foreground text-sm">
             البريد:
@@ -101,8 +111,14 @@ export function ActivationForm({
           </p>
         </div>
         <Button asChild className="mt-1">
-          <Link href={ACTIVATION_SIGNIN_HANDOFF}>
-            تسجيل الدخول وإكمال الإعداد
+          <Link
+            href={
+              isAdmin
+                ? ACTIVATION_SIGNIN_HANDOFF
+                : STAFF_ACTIVATION_SIGNIN_HANDOFF
+            }
+          >
+            {isAdmin ? "تسجيل الدخول وإكمال الإعداد" : "تسجيل الدخول"}
           </Link>
         </Button>
       </div>
@@ -120,7 +136,7 @@ export function ActivationForm({
       <div className="space-y-1.5 rounded-lg border bg-muted/40 p-3 text-sm">
         {businessName ? (
           <p>
-            دعوة لإدارة
+            {role === "ADMIN" ? "دعوة لإدارة" : "دعوة للانضمام إلى فريق"}
             <span className="font-medium"> {businessName} </span>
             على FlowPilot
           </p>
@@ -194,7 +210,9 @@ export function ActivationForm({
       </Button>
 
       <p className="text-muted-foreground text-center text-xs leading-5">
-        بعد التفعيل سننقلك إلى تسجيل الدخول لإكمال إعداد منشأتك.
+        {role === "ADMIN"
+          ? "بعد التفعيل سننقلك إلى تسجيل الدخول لإكمال إعداد منشأتك."
+          : "بعد التفعيل سننقلك إلى تسجيل الدخول لبدء العمل."}
       </p>
     </form>
   );

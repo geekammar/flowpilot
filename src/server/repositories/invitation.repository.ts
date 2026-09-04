@@ -8,9 +8,10 @@ import { db } from "@/server/db";
  * Invitation — FlowPilot domain concept (DECISIONS #22), separate from
  * Better Auth. Data primitives only: token generation/delivery belongs
  * to the workflow layer. Acceptance is the guarded conditional-update
- * primitive `acceptPendingInvitation`; activation (PROMPT-05) is the
- * atomic `activateInvitedAdmin` (invitation mark + Business membership
- * in one transaction).
+ * primitive `acceptPendingInvitation`; activation (PROMPT-05,
+ * generalized for STAFF in PROMPT-16) is the atomic
+ * `activateInvitedMember` (invitation mark + Business membership in
+ * one transaction, role taken from the persisted invitation).
  *
  * Conventions specific to this entity:
  * - Only the token HASH is stored; the raw token never reaches the DB.
@@ -39,7 +40,7 @@ export class InvitationActivationConflictError extends Error {
  * pre-checks eligibility with precise typed errors; this union covers
  * the in-transaction truth (including races).
  */
-export type ActivateInvitedAdminOutcome =
+export type ActivateInvitedMemberOutcome =
   | { status: "ACTIVATED"; invitation: Invitation; userId: string }
   | { status: "ALREADY_ACTIVATED" }
   | { status: "NOT_ACCEPTED" }
@@ -169,12 +170,14 @@ export class InvitationRepository {
   }
 
   /**
-   * Atomically completes ADMIN account activation for an accepted,
-   * unactivated invitation (PROMPT-05):
+   * Atomically completes invited-account activation for an accepted,
+   * unactivated invitation (PROMPT-05; generalized for STAFF in
+   * PROMPT-16 — DECISIONS #27):
    *
    * 1. Validation reads inside the transaction (invitation still
    *    accepted + unactivated; user row exists and is attachable —
-   *    businessId null, or already ADMIN of the SAME Business).
+   *    businessId null, or already a member of the SAME Business with
+   *    the invitation's own role).
    * 2. One-time guard: a conditional UPDATE sets `activatedAt` only
    *    while it is null (and the invitation is accepted + unrevoked).
    *    Two concurrent activations serialize here; the loser reads
@@ -182,19 +185,21 @@ export class InvitationRepository {
    * 3. Conditional membership attach: the user row is updated only
    *    when `businessId IS NULL` (never-assigned identity — the
    *    interrupted-activation recovery path) or `businessId` already
-   *    equals the invitation's Business with role ADMIN (idempotent
-   *    re-affirm). STAFF members of the same Business and users of
-   *    other Businesses match neither branch → the throw rolls the
-   *    transaction back, including the activatedAt mark.
+   *    equals the invitation's Business with the invitation's own
+   *    role (idempotent re-affirm). The persisted invitation is the
+   *    SOLE role authority — members of the same Business with a
+   *    different role and users of other Businesses match neither
+   *    branch → the throw rolls the transaction back, including the
+   *    activatedAt mark. A role is never silently changed.
    *
    * The user's password is never touched here — credentials belong to
    * Better Auth; this primitive only persists FlowPilot domain state.
    */
-  async activateInvitedAdmin(input: {
+  async activateInvitedMember(input: {
     invitationId: string;
     userId: string;
     businessId: string;
-  }): Promise<ActivateInvitedAdminOutcome> {
+  }): Promise<ActivateInvitedMemberOutcome> {
     return db.$transaction(async (tx) => {
       const invitation = await tx.invitation.findUnique({
         where: { id: input.invitationId },
@@ -213,7 +218,7 @@ export class InvitationRepository {
       if (!user) return { status: "USER_MISSING" } as const;
       const attachable =
         user.businessId === null ||
-        (user.businessId === input.businessId && user.role === "ADMIN");
+        (user.businessId === input.businessId && user.role === invitation.role);
       if (!attachable) return { status: "CONFLICT" } as const;
 
       const guard = await tx.invitation.updateMany({
@@ -234,12 +239,15 @@ export class InvitationRepository {
           id: input.userId,
           OR: [
             { businessId: null },
-            { businessId: input.businessId, role: "ADMIN" },
+            {
+              businessId: input.businessId,
+              role: invitation.role,
+            },
           ],
         },
         data: {
           businessId: input.businessId,
-          role: "ADMIN",
+          role: invitation.role,
           isActive: true,
         },
       });

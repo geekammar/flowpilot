@@ -69,10 +69,25 @@ export const activateAdminAccountInputSchema = z.object({
     .max(128, "كلمة المرور طويلة جداً"),
 });
 
+/**
+ * STAFF invitation creation input (PROMPT-16, team management): the
+ * client may supply ONLY the invitee email. Every other value is
+ * derived server-side from the authenticated actor (Business, role
+ * STAFF, invitedById) — a hostile businessId/role can never reach the
+ * invitation. The only allowed target role is STAFF (DECISIONS #02;
+ * ADMIN invitations remain the platform-operator provisioning path).
+ */
+export const createStaffInvitationInputSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(emailSchema),
+});
+
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 export type ListInvitationsInput = z.infer<typeof listInvitationsInputSchema>;
 export type RevokeInvitationInput = z.infer<typeof revokeInvitationInputSchema>;
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationInputSchema>;
 export type ActivateAdminAccountInput = z.infer<
   typeof activateAdminAccountInputSchema
+>;
+export type CreateStaffInvitationInput = z.infer<
+  typeof createStaffInvitationInputSchema
 >;

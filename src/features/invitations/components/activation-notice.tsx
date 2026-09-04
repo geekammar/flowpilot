@@ -10,7 +10,6 @@ import {
   CircleXIcon,
   ClockIcon,
   ShieldAlertIcon,
-  UserXIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -56,13 +55,6 @@ const NOTICE_DEFINITIONS: Record<ActivationNoticeState, NoticeDefinition> = {
     tone: "success",
     title: "الحساب مفعّل بالفعل",
     description: "تم تفعيل هذا الحساب سابقاً. يمكنك تسجيل الدخول مباشرة.",
-  },
-  ROLE_NOT_ALLOWED: {
-    icon: UserXIcon,
-    tone: "neutral",
-    title: "دعوة غير مدعومة",
-    description:
-      "هذه الدعوة مخصصة لأعضاء الفريق، وتفعيل حسابات الفريق غير متاح حالياً.",
   },
   CONFLICT: {
     icon: ShieldAlertIcon,

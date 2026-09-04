@@ -9,7 +9,7 @@ import {
 } from "@/features/invitations/schemas/invitation-schema";
 import type {
   AcceptInvitationSuccess,
-  ActivateAdminAccountSuccess,
+  ActivateInvitedAccountSuccess,
   CreateInvitationSuccess,
   GetInvitationByTokenSuccess,
   InvitationErrorCode,
@@ -27,7 +27,7 @@ import {
 } from "@/server/repositories";
 import type { BusinessRepository } from "@/server/repositories/business.repository";
 import type {
-  ActivateInvitedAdminOutcome,
+  ActivateInvitedMemberOutcome,
   InvitationRepository,
 } from "@/server/repositories/invitation.repository";
 import { InvitationActivationConflictError } from "@/server/repositories/invitation.repository";
@@ -40,12 +40,15 @@ import {
 import { APIError } from "better-auth/api";
 
 /**
- * Invitation creation + acceptance + ADMIN account activation
- * (DECISIONS #22 / #23): secure token creation (hash-only
- * persistence), business-scoped listing, revocation, one-time
- * token-based acceptance, and activation of an accepted ADMIN
- * invitation into a real Better Auth identity with Business ADMIN
- * membership. Delivery is a later prompt; there is no UI here.
+ * Invitation creation + acceptance + invited-account activation
+ * (DECISIONS #22 / #23 / #24; STAFF activation generalized in
+ * PROMPT-16): secure token creation (hash-only persistence),
+ * business-scoped listing, revocation, one-time token-based
+ * acceptance, and activation of an accepted invitation into a real
+ * Better Auth identity with the Business membership the invitation
+ * carries (ADMIN or STAFF — the persisted invitation is the role
+ * authority). Delivery is manual (the raw token is surfaced exactly
+ * once to the inviting ADMIN); there is no email infrastructure.
  *
  * Security invariants:
  * - The raw token is generated here and returned ONCE in the creation
@@ -195,7 +198,7 @@ export type InvitationServiceDeps = Readonly<{
     | "revoke"
     | "findByTokenHash"
     | "acceptPendingInvitation"
-    | "activateInvitedAdmin"
+    | "activateInvitedMember"
   >;
   businesses: Pick<BusinessRepository, "findById">;
   users: Pick<UserRepository, "findByEmail">;
@@ -427,9 +430,10 @@ export async function acceptInvitation(
  * Classifies an existing identity found for the invitation email.
  * Safe to link (returns the userId) only when the identity belongs to
  * no Business (never-assigned — the interrupted-activation recovery
- * path) or is already ADMIN of the invitation's own Business
- * (idempotent resume). Everything else is a typed conflict — the
- * identity is never silently moved or promoted.
+ * path) or is already a member of the invitation's own Business with
+ * the invitation's own role (idempotent resume). Everything else is a
+ * typed conflict — the identity is never silently moved, and its role
+ * is never silently changed.
  */
 function classifyExistingUser(
   user: { id: string; businessId: string | null; role: UserRole },
@@ -443,7 +447,10 @@ function classifyExistingUser(
       ),
     };
   }
-  if (user.businessId === invitation.businessId && user.role !== "ADMIN") {
+  if (
+    user.businessId === invitation.businessId &&
+    user.role !== invitation.role
+  ) {
     return {
       failure: failure(
         "ACCOUNT_CONFLICT",
@@ -505,24 +512,29 @@ export async function getInvitationByToken(
 }
 
 /**
- * Activates the ADMIN account of an ACCEPTED invitation by RAW token.
+ * Activates the account of an ACCEPTED invitation by RAW token
+ * (PROMPT-16: generalized from the ADMIN-only original — the persisted
+ * invitation's own role drives the membership; DECISIONS #24's
+ * consistency model applies unchanged).
  *
  * Flow: validate → hash (existing security utility) → locate by
- * tokenHash → enforce eligibility (ADMIN role, accepted, not revoked,
- * not yet activated; expiry only gates PENDING invitations — the
- * acceptance already ran inside the validity window) → handle identity
+ * tokenHash → enforce eligibility (accepted, not revoked, not yet
+ * activated; expiry only gates PENDING invitations — the acceptance
+ * already ran inside the validity window) → handle identity
  * collisions → create the Better Auth identity when none exists →
  * atomically mark the invitation activated and attach the Business
- * ADMIN membership → return the safe activation result.
+ * membership with the invitation's role → return the safe activation
+ * result.
  *
  * Security properties:
  * - Token-scoped, like acceptance: the persisted invitation is the
  *   sole authority for businessId/email/role — callers cannot override
- *   them (Zod strips every unknown key).
+ *   them (Zod strips every unknown key). A caller can never escalate
+ *   to a role the invitation does not carry.
  * - One identity per email: an existing identity is never duplicated,
  *   its password is never reset, and its role is never silently
- *   changed. STAFF members and other-Business users get a typed
- *   conflict.
+ *   changed. Members of the same Business with a different role and
+ *   users of other Businesses get a typed conflict.
  * - One activation per invitation: the repository's conditional
  *   `activatedAt` guard makes repeated and concurrent attempts fail
  *   with ACCOUNT_ALREADY_ACTIVATED.
@@ -533,10 +545,10 @@ export async function getInvitationByToken(
  * - The result carries safe data only — never the raw token, the hash,
  *   the password, or any session token.
  */
-export async function activateAdminAccount(
+export async function activateInvitedAccount(
   input: unknown,
   deps: InvitationServiceDeps = defaultDeps,
-): Promise<InvitationServiceResult<ActivateAdminAccountSuccess>> {
+): Promise<InvitationServiceResult<ActivateInvitedAccountSuccess>> {
   const parsed = activateAdminAccountInputSchema.safeParse(input);
   if (!parsed.success) return invalidInput(parsed.error.issues);
 
@@ -566,9 +578,6 @@ export async function activateAdminAccount(
       );
     case "ACTIVATED":
       return failure("ACCOUNT_ALREADY_ACTIVATED", "تم تفعيل هذا الحساب بالفعل");
-  }
-  if (invitation.role !== "ADMIN") {
-    return failure("ROLE_NOT_ALLOWED", "تفعيل الحساب متاح لدور المدير فقط");
   }
 
   // ── Identity collision handling (one identity per email) ──
@@ -621,10 +630,10 @@ export async function activateAdminAccount(
     }
   }
 
-  // ── Atomic activation: invitation mark + Business ADMIN membership ──
-  let outcome: ActivateInvitedAdminOutcome;
+  // ── Atomic activation: invitation mark + Business membership ──
+  let outcome: ActivateInvitedMemberOutcome;
   try {
-    outcome = await deps.invitations.activateInvitedAdmin({
+    outcome = await deps.invitations.activateInvitedMember({
       invitationId: invitation.id,
       userId,
       businessId: invitation.businessId,

@@ -30,7 +30,9 @@ export type StatusValue =
   | "booked"
   | "incomplete"
   | "active"
-  | "inactive";
+  | "inactive"
+  | "member-active"
+  | "member-inactive";
 
 export type StatusDefinition = {
   value: StatusValue;
@@ -128,6 +130,20 @@ export const STATUSES: Record<StatusValue, StatusDefinition> = {
   inactive: {
     value: "inactive",
     labelAr: "متوقفة",
+    tone: "neutral",
+    icon: CirclePause,
+  },
+  // Person states (team members) — masculine Arabic forms, same tones
+  // as the entity states above (PROMPT-16 team directory).
+  "member-active": {
+    value: "member-active",
+    labelAr: "نشط",
+    tone: "success",
+    icon: CircleCheck,
+  },
+  "member-inactive": {
+    value: "member-inactive",
+    labelAr: "متوقف",
     tone: "neutral",
     icon: CirclePause,
   },

@@ -2,15 +2,20 @@
 
 Invitation workflow foundation (DECISIONS #22): secure creation (token
 generation + hash-only persistence), business-scoped listing,
-revocation, one-time token-based acceptance, and ADMIN account
-activation (PROMPT-05) — connecting an accepted ADMIN invitation to a
-Better Auth identity with Business ADMIN membership. PROMPT-06 adds
-the activation UI: a public, read-only pre-screened activation route
-(`/invite/[token]`) and a server action that composes acceptance +
-activation, then hands the activated ADMIN off to the existing
-onboarding wizard via the safe sign-in redirect. Delivery remains a
-later prompt; the Team management screen will compose the creation
-side of this feature at the route layer.
+revocation, one-time token-based acceptance, and invited-account
+activation (PROMPT-05 ADMIN; generalized to both Business roles in
+PROMPT-16 — the persisted invitation's own role drives the attached
+membership) — connecting an accepted invitation to a Better Auth
+identity with its Business membership. The activation UI is the
+public, read-only pre-screened route (`/invite/[token]`) whose server
+action composes acceptance + activation, then hands the activated user
+off to a role-aware sign-in redirect (ADMIN → onboarding; STAFF → the
+authenticated app). PROMPT-16 adds the creation side for team
+management: `createStaffInvitation` (email-only input, ADMIN-only,
+tenant-scoped, fixed STAFF role) and the `StaffInviteDialog` that
+surfaces the raw invitation link exactly once for manual delivery —
+the Team screen composes them at the route layer. Email/WhatsApp
+delivery infrastructure remains out of scope (manual delivery only).
 
 ## Isolation rules
 
@@ -32,29 +37,35 @@ side of this feature at the route layer.
   successful acceptance; every later or concurrent attempt fails with a
   typed invalid-state error.
 - Acceptance results exclude both the raw token and the token hash.
-- Activation is ADMIN-only, requires prior acceptance, and is one-time:
-  the conditional `activatedAt` guard makes repeated and concurrent
-  attempts fail with `ACCOUNT_ALREADY_ACTIVATED`.
+- Activation requires prior acceptance and is one-time: the conditional
+  `activatedAt` guard makes repeated and concurrent attempts fail with
+  `ACCOUNT_ALREADY_ACTIVATED`.
 - Activation never creates a second identity for an email, never resets
   an existing password, and never silently changes a role; conflicting
-  identities (other Business, same-Business STAFF) are rejected with
-  `ACCOUNT_CONFLICT`.
+  identities (other Business, same-Business different role) are rejected
+  with `ACCOUNT_CONFLICT`. The persisted invitation is the sole role
+  authority — a caller can never escalate to a role the invitation does
+  not carry.
+- STAFF invitation creation (`createStaffInvitation`) accepts ONLY the
+  invitee email; the Business comes from the authenticated actor's
+  session, the target role is fixed to STAFF, and only Business ADMIN
+  may invite.
 - Passwords belong to Better Auth (`auth.api.signUpEmail` via the
   injectable identity creator); they are never hashed, stored, logged,
   or returned by this feature. Activation results carry safe data only
   (no raw token, no hash, no password, no session token).
 
-## Activation UI (PROMPT-06)
+## Activation UI (PROMPT-06; STAFF-generalized in PROMPT-16)
 
 - Route `src/app/(auth)/invite/[token]/page.tsx` is PUBLIC (the invitee
   is unauthenticated — the token in the path is the credential). It
   pre-screens via `getInvitationByToken` (read-only: hash-only lookup,
   derived status, business display name; NO mutation on GET) and
-  renders the activation form or a terminal notice (invalid / expired /
-  revoked / already-activated / staff-not-supported).
-- `activateInvitedAdminAction` (thin `"use server"` wrapper) delegates
-  to `completeAdminActivation` (`server/admin-activation-flow.ts`),
-  which composes the EXISTING `acceptInvitation` + `activateAdminAccount`
+  renders the role-aware activation form or a terminal notice
+  (invalid / expired / revoked / already-activated / conflict).
+- `activateInvitedAccountAction` (thin `"use server"` wrapper) delegates
+  to `completeInvitedActivation` (`server/activation-flow.ts`), which
+  composes the EXISTING `acceptInvitation` + `activateInvitedAccount`
   services: acceptance first (`INVITATION_ALREADY_ACCEPTED` is the
   resume path of an accepted-but-unactivated invitation, including
   interrupted activations), then activation, then typed-error mapping
@@ -64,13 +75,30 @@ side of this feature at the route layer.
   `activateAdminAccountInputSchema`); Zod strips everything else, and
   the persisted invitation stays the sole authority for
   businessId/email/role.
-- On success the screen shows the safe sign-in handoff
-  (`ACTIVATION_SIGNIN_HANDOFF` = `/sign-in?redirect=/onboarding`): the
-  activation service intentionally discards the auto-created session,
-  so the ADMIN signs in with the password they just chose and lands in
-  the existing onboarding wizard (DECISIONS #25). The sign-in form only
-  honors safe internal redirect paths; `/onboarding` itself is
-  ADMIN-guarded (`requireRole("ADMIN")` in the `(onboarding)` layout).
+- On success the screen shows the role-aware safe sign-in handoff:
+  ADMIN → `ACTIVATION_SIGNIN_HANDOFF` (`/sign-in?redirect=/onboarding`,
+  landing in the onboarding wizard, DECISIONS #25); STAFF →
+  `STAFF_ACTIVATION_SIGNIN_HANDOFF` (plain `/sign-in` — onboarding is
+  ADMIN-only and must never be a staff target). The activation service
+  intentionally discards the auto-created session; the sign-in form
+  only honors safe internal redirect paths.
 - The raw token never appears in the visible UI: it travels only
   through the route path (the invitation link) and the hidden form
   field into the action. No module in this feature logs it.
+
+## STAFF invitation creation (PROMPT-16, team management)
+
+- `createStaffInvitation` (`server/staff-invitation-flow.ts`) is THE
+  add-staff path composed by the Team screen at the route layer
+  (`/admin/team`). It composes the EXISTING `createInvitation` service
+  — there is no second invitation system.
+- `createStaffInvitationAction` (thin `"use server"` wrapper) builds
+  the actor from the authenticated session + database-backed user
+  record (least-privilege fallback), enforces ADMIN-only + tenant
+  scoping inside the flow, and revalidates `/admin/team` on success.
+- `StaffInviteDialog` collects the invitee email only (the client
+  schema is email-only); after a server-confirmed creation it renders
+  the one-time invitation link (`{origin}/invite/{rawToken}`) with a
+  copy affordance, an explicit "never shown again" warning, and the
+  derived expiry date — then hands the created invitation back to the
+  composing screen. No success state renders before the server result.

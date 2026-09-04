@@ -37,6 +37,7 @@ export const APP_NAV_ITEMS: NavItem[] = [
 /** Admin area navigation. */
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "لوحة الإدارة", icon: "shield" },
+  { href: "/admin/team", label: "الفريق", icon: "users" },
 ];
 
 /** Staff area navigation. */

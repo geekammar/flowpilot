@@ -164,25 +164,26 @@ delivery):
   INVITATION_EXPIRED / PERSISTENCE_FAILED. The result excludes both
   the raw token and the `tokenHash`; neither is ever logged.
 
-### CURRENT IMPLEMENTED — ADMIN account activation workflow (PROMPT-05)
+### CURRENT IMPLEMENTED — invited-account activation workflow (PROMPT-05; STAFF generalized in PROMPT-16)
 
-Connects an accepted ADMIN invitation to a real Better Auth identity
-and activates the Business ADMIN account (no UI, no session handling
-at this layer, no onboarding, no STAFF activation):
+Connects an accepted invitation to a real Better Auth identity and
+activates the Business membership (no session handling at this layer,
+no onboarding). Since PROMPT-16 the workflow is role-generic: the
+persisted invitation's own role (ADMIN or STAFF) drives the attached
+membership.
 
-- **Eligibility** (`activateAdminAccount` service operation): the
-  persisted invitation (located by token hash only) must be role
-  ADMIN, previously accepted, not revoked, and not yet activated.
-  Pending invitations (including expired-pending) and STAFF
-  invitations are rejected with typed Arabic errors
+- **Eligibility** (`activateInvitedAccount` service operation): the
+  persisted invitation (located by token hash only) must be previously
+  accepted, not revoked, and not yet activated. Pending invitations
+  (including expired-pending) are rejected with typed Arabic errors
   (`INVITATION_NOT_ACCEPTED` / `INVITATION_EXPIRED` /
-  `INVITATION_REVOKED` / `ROLE_NOT_ALLOWED`); already-activated
-  invitations return `ACCOUNT_ALREADY_ACTIVATED`. Expiry only gates
-  PENDING invitations — acceptance already ran inside the validity
-  window. The invitation is the sole authority for
-  email/businessId/role; the input schema accepts only token, name,
-  and password (Zod strips everything else — callers cannot override
-  business, role, or email).
+  `INVITATION_REVOKED`); already-activated invitations return
+  `ACCOUNT_ALREADY_ACTIVATED`. Expiry only gates PENDING invitations —
+  acceptance already ran inside the validity window. The invitation is
+  the sole authority for email/businessId/role; the input schema
+  accepts only token, name, and password (Zod strips everything else —
+  callers cannot override business, role, or email, and can never
+  escalate to a role the invitation does not carry).
 - **Identity creation** (Better Auth boundary): an injectable
   `IdentityCreator` (default: the installed version's official
   server-side `auth.api.signUpEmail`) creates the email/password
@@ -195,23 +196,25 @@ at this layer, no onboarding, no STAFF activation):
   no separate password policy is invented.
 - **One identity per email**: existing identities are never
   duplicated, never password-reset, and never silently moved or
-  promoted. Same-Business ADMIN identities resume activation
-  idempotently (`identityCreated: false`); never-assigned identities
-  (businessId null — the interrupted-activation recovery path) are
-  attached; other-Business identities and same-Business STAFF
-  identities are rejected with `ACCOUNT_CONFLICT`. A USER_ALREADY_
+  promoted. Same-Business identities carrying the invitation's own
+  role resume activation idempotently (`identityCreated: false`);
+  never-assigned identities (businessId null — the
+  interrupted-activation recovery path) are attached; other-Business
+  identities and same-Business identities with a different role are
+  rejected with `ACCOUNT_CONFLICT`. A USER_ALREADY_
   EXISTS race inside Better Auth is re-read and classified the same
   way.
 - **Atomic activation**
-  (`InvitationRepository.activateInvitedAdmin`): ONE Prisma
+  (`InvitationRepository.activateInvitedMember`): ONE Prisma
   transaction that (1) conditionally sets `invitations.activatedAt`
   (one-time guard — concurrent activations serialize and the loser
   reads ALREADY_ACTIVATED) and (2) conditionally attaches the Business
-  membership (`businessId`, `role: ADMIN`, `isActive: true`) only when
-  the user row is `businessId IS NULL` or already ADMIN of the SAME
-  Business; otherwise the throw rolls the whole transaction back. The
-  membership attach is therefore race-safe even when two Businesses
-  invite the same email concurrently.
+  membership (`businessId`, the invitation's own `role`, `isActive:
+true`) only when the user row is `businessId IS NULL` or already a
+  member of the SAME Business with the invitation's role; otherwise
+  the throw rolls the whole transaction back. The membership attach is
+  therefore race-safe even when two Businesses invite the same email
+  concurrently, and a role is never silently changed.
 - **Cross-boundary consistency**: Better Auth identity creation and
   the FlowPilot membership write are two sequential atomic phases
   (no shared transaction is possible through the supported Better
@@ -318,11 +321,11 @@ Highlights:
   business-scoped state primitives), `acceptPendingInvitation`
   (PROMPT-04: atomic conditional PENDING→ACCEPTED transition by token
   hash, including expiry enforcement at the database level), and
-  `activateInvitedAdmin` (PROMPT-05: atomic one-time `activatedAt`
-  mark + conditional Business ADMIN membership attach in one
-  transaction — never promotes STAFF, never steals cross-Business
-  users, rolls back fully on conflict). No `deletedAt` filter: the
-  entity has no soft delete.
+  `activateInvitedMember` (PROMPT-05, STAFF-generalized in PROMPT-16:
+  atomic one-time `activatedAt` mark + conditional Business membership
+  attach (role from the invitation) in one transaction — never changes
+  a role, never steals cross-Business users, rolls back fully on
+  conflict). No `deletedAt` filter: the entity has no soft delete.
 
 ## Seeding
 
