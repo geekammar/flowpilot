@@ -12,6 +12,36 @@
 3. Releases are **tags on `main`** (annotated, `vMAJOR.MINOR.PATCH`).
 4. The GitHub repository stays **private** during the discovery stage.
 
+## Lightweight Operator Ship (`pnpm ship`)
+
+The routine path after a finished prompt. The AI session ends with a green
+`pnpm verify` and stops; the human operator then ships with one local
+command:
+
+```bash
+pnpm ship patch              # 0.14.0 → 0.14.1  (commit: fix: release v0.14.1)
+pnpm ship minor              # 0.14.0 → 0.15.0  (commit: feat: release v0.15.0)
+pnpm ship --version 0.14.0   # explicit target (must be > current)
+```
+
+`scripts/ship.mjs` (dependency-free Node) performs: safety validation →
+version bump → one conventional commit (pre-commit secret hook stays
+active) → annotated tag `vX.Y.Z` (always exactly matching package.json) →
+push `main` + tag → published GitHub Release. It does **not** re-run the
+full build gate — the prompt's `pnpm verify` is the gate — and never
+deploys or touches the database.
+
+Safety: `main`-branch only; refuses existing tags (local + origin), major
+bumps, and non-fast-forward pushes; no force flags anywhere; failures
+print exact recovery commands. Tag/release titles are derived from
+`BUILD_STATE.md` — no invented work.
+
+**`pnpm ship` vs `pnpm release`**: ship = lightweight routine operator
+shipping after a verified prompt; release = the full gated path below
+(gh auth → doctor → verify → security), unchanged, for recovery or
+high-confidence releases. Both produce the same artifact shape (annotated
+`vX.Y.Z` tag on `main` + GitHub Release), so they never contradict.
+
 ## One-Command Release
 
 ```bash

@@ -1,6 +1,6 @@
 {
   "name": "flowpilot",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup-env.mjs && pnpm install && pnpm db:generate && node scripts/install-git-hooks.mjs",
@@ -8,6 +8,7 @@
     "verify": "node scripts/verify.mjs",
     "security": "node scripts/security-check.mjs",
     "release": "bash scripts/release.sh",
+    "ship": "node scripts/ship.mjs",
     "vercel:check": "node scripts/vercel-check.mjs",
     "deploy": "node scripts/deploy.mjs",
     "deploy:check": "node scripts/pre-deploy.mjs",

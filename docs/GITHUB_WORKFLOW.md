@@ -42,7 +42,8 @@ release creation) requires a successful `gh auth login` first.
 - **Never commit secrets**: the pre-commit hook blocks env/key files and
   secret-looking content (`pnpm run hooks:install` after a fresh clone).
 - **Tags mark releases**: `v0.1.0`, `v0.1.1`, … from `main`, annotated.
-  Process: `RELEASE_PROCESS.md`.
+  Process: `RELEASE_PROCESS.md` — routine shipping via `pnpm ship
+patch/minor` (lightweight operator path), full gates via `pnpm release`.
 
 ## When collaboration starts (future)
 

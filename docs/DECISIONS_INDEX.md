@@ -12,7 +12,7 @@
 - Open `docs/DECISIONS.md` only when the current task touches a decision,
   this index is insufficient, a conflict must be investigated, or
   authoritative historical detail is required.
-- Entry numbers map to the `#` column of `DECISIONS.md` (01–25; no
+- Entry numbers map to the `#` column of `DECISIONS.md` (01–26; no
   reversals to date — see `DECISIONS.md → Reversals`).
 
 ## Product & UX
@@ -92,6 +92,9 @@
 - #18 — Release model — private GitHub repo, single `main`, annotated
   `vX.Y.Z` tags, gated `pnpm release`; CI and branch protection deferred
   until a second contributor.
+- #26 — Two release paths — `pnpm ship patch/minor` = lightweight routine
+  operator shipping after a verified prompt (no gate re-run, no deploy, no
+  DB); `pnpm release` stays the full gated path.
 - #19 — Vercel readiness — `postinstall: prisma generate` + explicit
   `buildCommand` in `vercel.json`; gated deploy commands; dependency-free
   `/api/health`; the `build` script itself stays untouched.
