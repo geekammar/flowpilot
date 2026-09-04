@@ -59,4 +59,4 @@
 
 1. `pnpm run doctor` — read every `→ fix:` line; it covers the common cases.
 2. `docs/BUILD_STATE.md` → Known Issues of each prompt (device limitations).
-3. `docs/CONTEXT_RECOVERY.md` — full recovery procedure.
+3. `docs/AGENT_RULES.md` — binding context-loading and lifecycle rules.

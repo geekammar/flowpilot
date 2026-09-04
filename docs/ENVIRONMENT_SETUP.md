@@ -2,7 +2,6 @@
 
 > How to get FlowPilot running on Windows, Linux, macOS, and Termux (Android)
 > with the least manual work. Companion scripts live in `scripts/`.
-> Audit of the previous state: `docs/PROJECT_AUDIT.md`.
 
 ## TL;DR — First Run
 

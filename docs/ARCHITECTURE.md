@@ -183,7 +183,7 @@ activation workflow remain planned.
 
 ## Design System
 
-Documented separately in `DESIGN_SYSTEM.md`; implemented via tokens in
+Documented separately in `UX.md` (UX + design rules); implemented via tokens in
 `src/app/globals.css` (colors, radii, shadows, z-index scale, animation
 scale, status colors).
 

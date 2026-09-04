@@ -87,7 +87,7 @@ that slips through).
 
 ## CI Notes
 
-No CI pipeline exists yet (deliberate — see `PROJECT_AUDIT.md`). When one is
+No CI pipeline exists yet (deliberate — see `DECISIONS.md` #18). When one is
 approved, the gate is simply:
 
 ```sh

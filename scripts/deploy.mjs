@@ -78,7 +78,7 @@ if (mode === "check") {
     "\nDEPLOYMENT READY ✅\n" +
       "Next: pnpm deploy            (production — shareable URL)\n" +
       "      pnpm deploy:preview    (throwaway preview URL)\n" +
-      "First time on this machine? docs/VERCEL_QUICK_DEPLOY.md — under 5 minutes.",
+      "First time on this machine? docs/VERCEL_DEPLOYMENT.md Section 0 — quick deploy.",
   );
   process.exit(0);
 }
@@ -121,7 +121,7 @@ if (!existsSync(".vercel/project.json")) {
   fail(
     "This directory is not linked to a Vercel project yet.\n" +
       `   → Run: ${vercel ? "vercel link" : "pnpm dlx vercel@latest link"}   (once; follow the prompts)\n` +
-      "   → Prefer the GitHub-connected flow instead? See docs/VERCEL_QUICK_DEPLOY.md\n" +
+      "   → Prefer the GitHub-connected flow instead? See docs/VERCEL_DEPLOYMENT.md\n" +
       "     (push + Vercel import — then every push to main redeploys automatically).",
   );
 }

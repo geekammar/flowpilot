@@ -8,7 +8,7 @@ beauty, coaching, gyms, education, services) before selecting a winning
 vertical. **The UI and domain model stay completely vertical-agnostic.**
 
 > 📚 **Project memory / source of truth:** start with
-> [`docs/PROJECT_README.md`](docs/PROJECT_README.md), then follow
+> [`docs/CORE_CONTEXT.md`](docs/CORE_CONTEXT.md), then follow
 > [`docs/AGENT_RULES.md`](docs/AGENT_RULES.md) before making any change.
 
 ---
@@ -30,8 +30,8 @@ vertical. **The UI and domain model stay completely vertical-agnostic.**
 | Deploy    | Vercel                         |
 | Pkg mgr   | pnpm                           |
 
-Deployment quick path (< 5 min): `docs/VERCEL_QUICK_DEPLOY.md` · Full guide:
-`docs/VERCEL_DEPLOYMENT.md` · Environment variables:
+Deployment guide: `docs/VERCEL_DEPLOYMENT.md` (Section 0 = quick path
+under 5 minutes) · Environment variables:
 `docs/ENVIRONMENT_VARIABLES.md` · Demo package for prospects:
 `docs/CLIENT_DEMO.md` · Liveness/readiness probe: `/api/health`.
 

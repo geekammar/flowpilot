@@ -2,8 +2,8 @@
 
 > Everything needed to demo FlowPilot to a prospect: the URL, the credentials,
 > what to show, and what to say. Setup how-to for the operator:
-> `VERCEL_QUICK_DEPLOY.md` (deploy in < 5 min) · detailed walkthrough for the
-> operator's own practice: `DEMO_GUIDE.md` · timed sales talk track:
+> `VERCEL_DEPLOYMENT.md` (Section 0 — deploy in < 5 min) · detailed walkthrough
+> for the operator's own practice: `DEMO_GUIDE.md` · timed sales talk track:
 > `DEMO_SCRIPT.md`.
 
 ## SECTION 1 — Demo URL

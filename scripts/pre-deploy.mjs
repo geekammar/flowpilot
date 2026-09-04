@@ -445,7 +445,7 @@ function finish() {
         "Environment, database, Prisma, auth, and build are deployment-ready.\n" +
         "Next: pnpm deploy            (production — shareable URL)\n" +
         "      pnpm deploy:preview    (throwaway preview URL — auth may not work there)\n" +
-        "First time?  docs/VERCEL_QUICK_DEPLOY.md — under 5 minutes.",
+        "First time?  docs/VERCEL_DEPLOYMENT.md Section 0 — quick deploy.",
     );
     process.exit(0);
   }

@@ -64,7 +64,7 @@ confirmed appointments (Arabic-first, RTL, vertical-agnostic, PWA).
 ### Known placeholders (Spec A continues)
 Auth sign-up, customers directory, services, settings, team, staff area.
 
-See docs/PROJECT_STATUS.md and docs/BUILD_STATE.md for details.
+See docs/BUILD_STATE.md for details.
 NOTES
 )"
   # Expand $TAG inside the default notes.

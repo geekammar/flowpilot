@@ -84,7 +84,7 @@ gh repo create flowpilot --private --source=. --remote=origin \
   --description "WhatsApp Appointment Conversion System — book more, chase less."
 git push -u origin main && git push origin v0.1.0
 gh release create v0.1.0 --verify-tag --title "FlowPilot v0.1.0" \
-  --notes "Initial Pilot-Ready Core — see docs/PROJECT_STATUS.md"
+  --notes "Initial Pilot-Ready Core — see docs/BUILD_STATE.md"
 ```
 
 ## Versioning
@@ -105,5 +105,5 @@ gh release create v0.1.0 --verify-tag --title "FlowPilot v0.1.0" \
 
 ## See Also
 
-`GITHUB_WORKFLOW.md` (how we use GitHub day-to-day) · `PROJECT_STATUS.md`
-(current state) · `RELEASE_REPORT.md` (v0.1.0 report).
+`GITHUB_WORKFLOW.md` (how we use GitHub day-to-day) · `BUILD_STATE.md`
+(current state).
