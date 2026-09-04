@@ -169,6 +169,20 @@ export class AppointmentRepository {
     });
   }
 
+  /**
+   * Latest appointment per customer for context rows (staff workspace
+   * queue). One business-scoped read; callers pick the first row per
+   * customer (already ordered newest-first).
+   */
+  async listLatestByCustomers(businessId: string, customerIds: string[]) {
+    if (customerIds.length === 0) return [];
+    return db.appointment.findMany({
+      where: { businessId, customerId: { in: customerIds }, ...notDeleted },
+      include: { service: { select: { id: true, name: true } } },
+      orderBy: [{ date: "desc" }, { startTime: "desc" }],
+    });
+  }
+
   async create(input: CreateAppointmentDto): Promise<Appointment> {
     const { date, startTime, endTime, assignedUserId, notes, ...rest } = input;
     return db.appointment.create({

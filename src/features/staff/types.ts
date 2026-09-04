@@ -1,4 +1,9 @@
-import type { UserRole } from "@/types/domain";
+import type {
+  AppointmentStatus,
+  ConversationStatus,
+  MessageSenderType,
+  UserRole,
+} from "@/types/domain";
 
 import type { ComponentType } from "react";
 
@@ -65,3 +70,74 @@ export type StaffInviteDialogComponent = ComponentType<{
   onOpenChange: (open: boolean) => void;
   onCreated: (invitation: TeamInvitationItem) => void;
 }>;
+
+/**
+ * Staff workspace types (PROMPT-17) — the human-handoff queue. The
+ * workspace composes the conversations feature's existing takeover
+ * action at the route layer through the structural
+ * `TakeOverConversationAction` contract below (no cross-feature
+ * imports, no second assignment system).
+ */
+
+/** Assignment state of a queue item, derived server-side from the actor. */
+export type QueueAssignment = "unassigned" | "mine" | "other";
+
+/** Lightweight customer identity on a workspace row. */
+export type WorkspaceCustomer = {
+  id: string;
+  name: string;
+  phone: string;
+};
+
+/** Latest appointment context on a workspace row (when present). */
+export type WorkspaceAppointment = {
+  id: string;
+  serviceName: string;
+  /** "YYYY-MM-DD" (business-local calendar date). */
+  date: string;
+  startTime: string;
+  status: AppointmentStatus;
+};
+
+/** Serializable row of the NEED_HUMAN handoff queue. */
+export type StaffQueueItem = {
+  id: string;
+  assignment: QueueAssignment;
+  assignedUserName: string | null;
+  customer: WorkspaceCustomer;
+  lastMessage: {
+    content: string;
+    senderType: MessageSenderType;
+    createdAt: string;
+  } | null;
+  lastActivityAt: string;
+  latestAppointment: WorkspaceAppointment | null;
+};
+
+/** Serializable row of the "assigned to me" (non-handoff) section. */
+export type StaffAssignedItem = {
+  id: string;
+  status: ConversationStatus;
+  customer: WorkspaceCustomer;
+  lastMessage: {
+    content: string;
+    senderType: MessageSenderType;
+    createdAt: string;
+  } | null;
+  lastActivityAt: string;
+  latestAppointment: WorkspaceAppointment | null;
+};
+
+export type StaffWorkspaceResult =
+  | { success: true; queue: StaffQueueItem[]; assigned: StaffAssignedItem[] }
+  | { success: false; message: string };
+
+/**
+ * Structural contract for the route-composed takeover action (the
+ * conversations feature's `transitionConversation` satisfies it — the
+ * ONE existing takeover mechanism is reused, never duplicated).
+ */
+export type TakeOverConversationAction = (input: {
+  id: string;
+  transition: "TAKE_OVER";
+}) => Promise<{ success: boolean; message?: string }>;

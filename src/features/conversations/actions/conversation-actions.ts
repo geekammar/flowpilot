@@ -29,6 +29,7 @@ function refreshConversation(id: string) {
   revalidatePath("/conversations");
   revalidatePath(`/conversations/${id}`);
   revalidatePath("/");
+  revalidatePath("/staff");
 }
 
 export async function assignConversation(
@@ -112,7 +113,12 @@ export async function sendStaffReply(
         content: parsed.data.content,
       },
       {
-        assignedUserId: context.user.id,
+        // Replying takes ownership only when the thread is unowned —
+        // an already-assigned conversation is never silently stolen;
+        // ownership changes only through explicit takeover/assignment.
+        ...(context.conversation.assignedUserId
+          ? {}
+          : { assignedUserId: context.user.id }),
         status: "NEED_HUMAN",
       },
     );

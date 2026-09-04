@@ -26,7 +26,8 @@ export type NavItem = {
 
 /** Main authenticated app navigation (generic — no vertical terminology). */
 export const APP_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "الرئيسية", icon: "home" },
+  { href: "/", label: "الرئيسية", icon: "home", roles: ["ADMIN"] },
+  { href: "/staff", label: "مهامي", icon: "clipboard", roles: ["STAFF"] },
   { href: "/appointments", label: "المواعيد", icon: "calendar" },
   { href: "/conversations", label: "المحادثات", icon: "message" },
   { href: "/customers", label: "العملاء", icon: "users" },
@@ -40,7 +41,9 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/admin/team", label: "الفريق", icon: "users" },
 ];
 
-/** Staff area navigation. */
+/** Staff area navigation — the workspace plus the shared operational screens. */
 export const STAFF_NAV_ITEMS: NavItem[] = [
-  { href: "/staff", label: "لوحة الفريق", icon: "clipboard" },
+  { href: "/staff", label: "مهامي", icon: "clipboard" },
+  { href: "/conversations", label: "المحادثات", icon: "message" },
+  { href: "/appointments", label: "المواعيد", icon: "calendar" },
 ];

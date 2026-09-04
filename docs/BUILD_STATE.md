@@ -6,13 +6,13 @@
 > completed work, known issues, next step — not a historical diary.
 > Historical implementation detail lives in Git history (`git log --oneline`,
 > `git show <commit>`, release tags) and `DECISIONS.md`.
-> Last updated: PROMPT-16 (Team Management + STAFF activation lifecycle).
-> Product version: **v0.13.2**.
+> Last updated: PROMPT-17 (Staff Area / Human Handoff UX).
+> Product version: **v0.13.2** (pre-ship; operator bumps via `pnpm ship`).
 
 ## Current State (summary)
 
 **Spec A — Discovery Foundation + Booking Core** (frozen scope: `SPEC_A.md`)
-is implemented and verified prompt-by-prompt through team management.
+is implemented and verified prompt-by-prompt through the staff workspace.
 Complete: the booking core (dashboard, conversations inbox + detail,
 appointments agenda/detail, services, settings, deterministic availability,
 Smart Create steps 1–6 — review hands off to التأكيد, which creates the
@@ -25,13 +25,15 @@ manual link delivery, STAFF member activate/deactivate, generalized
 invited-account activation for BOTH Business roles at `/invite/[token]`),
 the invitation-first auth lifecycle (data model → creation → acceptance →
 ADMIN/STAFF activation → activation UI → role-aware sign-in handoff →
-onboarding handoff), the 4-step onboarding wizard, and the ops toolchain
-(bootstrap/dev scripts, doctor/verify/security, gated releases, Vercel
-deployment, demo dataset, pilot distribution).
+onboarding handoff), the 4-step onboarding wizard, the STAFF operational
+workspace (`/staff`: NEED_HUMAN human-handoff queue with takeover,
+assigned-to-me section, appointment context — see PROMPT-17 below), and the
+ops toolchain (bootstrap/dev scripts, doctor/verify/security, gated
+releases, Vercel deployment, demo dataset, pilot distribution).
 
-**Remaining Spec A placeholders:** business knowledge screen, staff area.
-The `/sign-up` placeholder page remains in code but is superseded
-(invitation-first, DECISIONS #22).
+**Remaining Spec A placeholders:** business knowledge screen
+(`/settings/knowledge` stub). The `/sign-up` placeholder page remains in
+code but is superseded (invitation-first, DECISIONS #22).
 
 **Quality:** `pnpm verify` green (lint/typecheck/format/build);
 `pnpm security` clean; `pnpm run doctor` NOT READY on this device only
@@ -62,6 +64,7 @@ The `/sign-up` placeholder page remains in code but is superseded
 | Smart Create step 6         | التأكيد: final read-only summary + confirmation-mode behavior → creates through the canonical `createAppointment` path; typed failures incl. `SLOT_CONFLICT` recovery to Step 4; server-confirmed success state + detail-page navigation                                                                                                                                                                                                                                                                                                                                                                                                                                                              | v0.13.0         |
 | Customers directory         | `/customers`: server-backed debounced search (name/phone), rows with last conversation/appointment, honest states; `/customers/[id]`: identity + notes + appointment/conversation history, all rows navigable; ONE canonical creation path (`createCustomerAction` → customers service, typed `DUPLICATE_PHONE`); Smart Create Step 1 composes the same create dialog (route-layer composition)                                                                                                                                                                                                                                                                                                       | PROMPT-15       |
 | Team management             | `/admin/team`: member directory (identity, ADMIN/STAFF role, active state, self marker), open STAFF invitations (pending/accepted states), ONE canonical add-staff path (`createStaffInvitation` → existing `createInvitation` service; email-only input, ADMIN-only, tenant-scoped, fixed STAFF role), one-time manual invite-link delivery in `StaffInviteDialog`, STAFF activate/deactivate via `User.isActive` (ADMIN targets blocked — no lockout); invited-account activation generalized to invitation-role-driven (`activateInvitedMember`/`activateInvitedAccount`, DECISIONS #27) — `/invite/[token]` activates BOTH roles with role-aware sign-in handoff (STAFF never sent to onboarding) | PROMPT-16       |
+| Staff workspace             | `/staff` (STAFF-only, `(staff)` group): the human-handoff workspace — NEED_HUMAN queue (unassigned → mine → others) with takeover via the EXISTING `transitionConversation` action route-injected (one assignment system), assigned-to-me section, customer/last-message/status/activity/latest-appointment context rows; navigation made role-aware (staff see مهامي، not the admin dashboard); reply no longer silently reassigns owned conversations; conversation detail gains takeover for unassigned NEED_HUMAN (PROMPT-17, DECISIONS #28)                                                                                                                                                      | PROMPT-17       |
 | Ops (DX, non-product)       | Cross-platform bootstrap/dev scripts, `pnpm run setup/doctor`, `pnpm verify`, `pnpm security` + pre-commit hook, gated `pnpm release`, Vercel deploy toolchain (`pnpm deploy*`), Egyptian demo dataset + `DEMO_MODE`, distribution docs                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Ops 01–06       |
 | Ops (ship tooling)          | Lightweight operator ship path `pnpm ship patch/minor` (`scripts/ship.mjs`, dependency-free Node; DECISIONS #26): safety validation → version bump → one conventional commit → annotated tag → push main + tag → published GitHub Release; never re-runs the full gate (the prompt's `pnpm verify` is the gate), never deploys or touches the DB; full `pnpm release` preserved unchanged                                                                                                                                                                                                                                                                                                             | Ops 07          |
 
@@ -83,6 +86,14 @@ The `/sign-up` placeholder page remains in code but is superseded
 - WhatsApp transport is not implemented: the inbox reads DB/seeded messages;
   staff replies persist through repositories. Message send/transport stays
   behind an interface (Spec A §8).
+- The staff workspace queue reuses the inbox read (caps at 100
+  conversations, no pagination) and shows the LATEST appointment per
+  customer as context (not specifically the next upcoming one) — both
+  accepted at pilot scale.
+- Takeover/assignment ownership changes are explicit-action-only (DECISIONS
+  #28); the workspace offers takeover ONLY for unassigned threads — taking
+  over someone else's thread requires the conversation detail's explicit
+  assignment path.
 - Invitation token delivery is manual: the raw invite link is surfaced to
   the inviting ADMIN exactly once in the Team invite dialog (copy +
   "never shown again"); email/WhatsApp delivery is out of scope.
@@ -143,63 +154,65 @@ on-device (Termux schema-engine limitation — apply from desktop/CI with
 3. For deployment: Vercel env vars (Production + Preview) + `pnpm db:deploy`
    against Neon from desktop/CI (`VERCEL_DEPLOYMENT.md`).
 
-## PROMPT-16 — Team Management
+## PROMPT-17 — Staff Area / Human Handoff UX
 
-- **Scope:** the Spec A Team area only — team directory, STAFF
-  invitation/addition (canonical invitation path), staff identity/role
-  display, STAFF activate/deactivate, minimal role-aware boundaries, and the
-  smallest missing invitation-lifecycle layer (invitation creation UI +
-  STAFF activation workflow). No permissions matrix, no new roles, no staff
-  workspace, no delivery infrastructure; zero schema changes.
+- **Scope:** the smallest complete STAFF operational workspace for the
+  Human-in-the-Loop flow — NEED_HUMAN queue, safe takeover, reuse of the
+  existing conversation detail + reply path, minimum customer/appointment
+  context. No staff management, no permissions, no second
+  conversation/assignment/auth system; ZERO schema changes.
 - **Implementation:**
-  - Activation generalization (DECISIONS #27): the repository primitive is
-    `activateInvitedMember` (role taken from the PERSISTED invitation — sole
-    authority); service `activateInvitedAccount` + composition
-    `completeInvitedActivation` + action `activateInvitedAccountAction`;
-    `/invite/[token]` renders the activation form for BOTH Business roles
-    with role-aware copy and handoff (ADMIN → `/sign-in?redirect=/onboarding`
-    unchanged; STAFF → plain `/sign-in` — onboarding is never a staff
-    target). `ROLE_NOT_ALLOWED` is removed (unreachable).
-  - `src/features/invitations/`: `createStaffInvitation` flow (email-only
-    Zod input; ADMIN-only actor guard; businessId/role/invitedById all
-    server-derived; composes the EXISTING `createInvitation` — one canonical
-    path), `createStaffInvitationAction` (session wrapper, revalidates
-    `/admin/team`), `StaffInviteDialog` (Arabic form → server-confirmed
-    one-time invite link with copy + never-again warning + expiry date).
-  - `src/features/staff/`: `team-service` (`listTeam` + `setTeamMemberActive`
-    — ADMIN-only, tenant-scoped, STAFF-targets-only so no ADMIN can lock the
-    business out; injectable deps), thin actions, `TeamScreen` (members with
-    identity/role/active badges + "أنت" self marker, pending-invitations
-    section with PENDING/ACCEPTED-unactivated states, honest
-    empty/error/loading states, route-injected invite dialog).
-  - Routes: `/admin/team` (+ loading skeleton) composes staff +
-    invitations features at the route layer; `/admin` becomes the entry
-    card; ADMIN nav gains الفريق. Canonical status system gains
-    person-state values (`member-active`/`member-inactive`); `MEMBER_NOUNS`
-    added to the Arabic pluralization helpers.
-- **Tests:** temporary offline harness (removed after the run) — 73/73
-  checks: real services/flows against in-memory stand-ins (team read/write
-  with role+tenant guards, deactivate/reactivate, cross-tenant NOT_FOUND,
-  ADMIN-target lockout protection, hostile businessId/role stripping,
-  duplicate/invalid invitation inputs, invitation listing tenant scope,
-  generalized activation lifecycle for both roles incl. conflicts/resume/
-  one-time guarantees, role-aware composition handoff) + real markup
-  assertions (identity/roles/states/actions/empty state/360px patterns/
-  aria-live) + source-level wiring checks (single creation path, logical
-  CSS only, repository-only Prisma, requireUser in actions, honest dialog
-  states, keyboard-accessible interactions).
-- **Known limitations:** see "Key Known Limitations" (manual token
-  delivery; no revocation UI; STAFF-target-only deactivation).
-- **Exact next step:** PROMPT-17 — Staff Area / Human Handoff UX.
+  - `src/features/staff/`: `workspace-service.ts` (`getStaffWorkspace` —
+    STAFF-only, tenant-scoped from the session-derived actor, injectable
+    repository deps; queue = all NEED_HUMAN ordered unassigned → mine →
+    others, assigned section = actor's non-NEED_HUMAN threads; latest
+    appointment per visible customer via ONE new repository read),
+    `staff-workspace.tsx` (calm queue UI: identity, preview, activity,
+    canonical status, assignment marker, appointment chip; per-row action =
+    takeover for unassigned, follow-up links otherwise; honest
+    empty/error states, duplicate-submit protection, `role="alert"` +
+    `aria-live`), workspace types incl. the structural
+    `TakeOverConversationAction` contract.
+  - Routes: `/staff` page composes staff + conversations features (the
+    conversations feature's `transitionConversation` is injected as the
+    takeover prop — route-layer composition, feature isolation intact);
+    `loading.tsx` skeleton; `(staff)` layout guard unchanged
+    (`requireRole("STAFF")`, ADMIN unaffected).
+  - Navigation: STAFF nav = مهامي + المحادثات + المواعيد; in `(app)`,
+    staff see مهامي instead of the ADMIN dashboard item (`/` is
+    ADMIN-only in nav — direct visits still redirect STAFF → `/staff`).
+  - Conversations feature (minimal extensions): `sendStaffReply` takes
+    ownership only when the thread is UNOWNED (previously reassigned on
+    every reply — the silent steal; the detail UI's optimistic logic
+    already assumed preserve-if-assigned); `refreshConversation`
+    revalidates `/staff`; conversation detail offers تولّي المحادثة for
+    unassigned NEED_HUMAN threads (previously only AI_ACTIVE).
+  - `AppointmentRepository.listLatestByCustomers`: one business-scoped
+    read for queue appointment context (repository-only Prisma preserved).
+- **Tests:** temporary offline harness (removed after the run) — 62/62
+  checks: real service logic against in-memory stand-ins (STAFF allowed,
+  ADMIN/roleless rejected, tenant scoping captured at the repository
+  boundary, queue filtering/priority/assignment discriminators,
+  per-actor views, appointment mapping, load failure), real markup via
+  `renderToStaticMarkup` (queue rendering, exactly one takeover button —
+  unassigned only, معينة إليك/معينة إلى markers, links into
+  `/conversations/[id]`, appointment context, empty states, aria-live,
+  native buttons, 360px patterns), Zod hostile-input stripping
+  (businessId/role/sender fields dropped), and source wiring checks
+  (guards, cross-tenant rejection, single takeover path, logical CSS
+  only, feature isolation, repository-only Prisma).
+- **Known limitations:** see "Key Known Limitations" (queue reads cap at
+  the inbox's 100 conversations; appointment context shows the LATEST
+  appointment, not specifically the next upcoming one).
+- **Exact next step:** PROMPT-18 — the last Spec A placeholder: the
+  business knowledge screen (`/settings/knowledge`, Spec A §6).
 
 ## Next Step (product)
 
-**PROMPT-17 — Staff Area / Human Handoff UX.** The dedicated staff
-experience (own agenda, assigned conversations, human-handoff resolution
-workflow) building on the role boundaries and STAFF memberships this
-prompt established. After that, the remaining Spec A placeholder (business
-knowledge screen) proceeds per the operator's choice. Spec A exit
-criteria: see `SPEC_A.md → Spec Sequence & Exit Criteria`.
+**PROMPT-18 — Business Knowledge screen** (`/settings/knowledge`):
+structured FAQ/knowledge entries (plain stored text, no vector DB/RAG),
+ADMIN-only, tenant-scoped — the last remaining Spec A placeholder. Spec A
+exit criteria: see `SPEC_A.md → Spec Sequence & Exit Criteria`.
 
 After each prompt: update this file (minimally) and append to
 `DECISIONS.md` when a decision was made.

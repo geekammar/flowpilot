@@ -236,7 +236,8 @@ export function ConversationDetail({
         </header>
 
         <div className="flex flex-wrap gap-2 border-b px-4 py-2.5">
-          {data.status === "AI_ACTIVE" ? (
+          {data.status === "AI_ACTIVE" ||
+          (data.status === "NEED_HUMAN" && !data.assignedUser) ? (
             <Button
               type="button"
               size="sm"
