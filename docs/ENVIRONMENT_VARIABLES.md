@@ -13,8 +13,15 @@
 | `BETTER_AUTH_URL`     | server          | `https://flowpilot-demo.vercel.app`                        | Better Auth `baseURL` (redirects, callback URLs)         |
 | `NEXT_PUBLIC_APP_URL` | server + client | `https://flowpilot-demo.vercel.app`                        | Root layout `metadataBase`, Better Auth `trustedOrigins` |
 
-There are no optional variables today — all four are required everywhere
-(dev, build, production runtime).
+There is one optional variable (PROMPT-19):
+
+| Variable                | Scope  | Example                | Used by                                                                   |
+| ----------------------- | ------ | ---------------------- | ------------------------------------------------------------------------- |
+| `INBOUND_WEBHOOK_TOKEN` | server | 32+ char random string | `POST /api/conversations/inbound` gate — unset ⇒ inbound webhook disabled |
+
+While `INBOUND_WEBHOOK_TOKEN` is unset, the provider-neutral inbound
+webhook answers 503 and no external message can enter the system
+(DECISIONS #29). The four variables above remain required everywhere.
 
 ## Validation
 

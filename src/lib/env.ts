@@ -4,6 +4,14 @@ const serverEnvSchema = z.object({
   DATABASE_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  /**
+   * Shared secret gating the provider-neutral inbound webhook
+   * (PROMPT-19). Optional: when unset the inbound route is DISABLED
+   * (503) — no unauthenticated message can enter the system. A real
+   * provider adapter verifies its own provider signatures and either
+   * holds this token or calls the engine service directly.
+   */
+  INBOUND_WEBHOOK_TOKEN: z.string().min(32).optional(),
 });
 
 const clientEnvSchema = z.object({

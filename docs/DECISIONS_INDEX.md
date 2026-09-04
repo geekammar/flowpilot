@@ -12,7 +12,7 @@
 - Open `docs/DECISIONS.md` only when the current task touches a decision,
   this index is insufficient, a conflict must be investigated, or
   authoritative historical detail is required.
-- Entry numbers map to the `#` column of `DECISIONS.md` (01–26; no
+- Entry numbers map to the `#` column of `DECISIONS.md` (01–29; no
   reversals to date — see `DECISIONS.md → Reversals`).
 
 ## Product & UX
@@ -27,6 +27,14 @@
   bottom navigation.
 - #09 — Visual direction — Premium-calm (refined indigo, deep-neutral dark,
   soft shadows); explicitly no neon/gradients/AI gimmicks.
+- #29 — Conversation engine (PROMPT-19) — ONE provider-neutral inbound path
+  (webhook gated by optional `INBOUND_WEBHOOK_TOKEN`, business resolved by
+  receiving WhatsApp number, never payload `businessId`); `ConversationAi`
+  - `MessageTransport` are the only approved vendor seams, currently
+    deterministic offline implementations (NO LLM, NO live WhatsApp); FAQ
+    replies are verbatim `Business.faqs`; all booking intents and every
+    unsafe case → NEED_HUMAN; the engine never creates appointments; real
+    WhatsApp/AI providers remain undecided operator decisions.
 
 ## Roles & Authentication
 

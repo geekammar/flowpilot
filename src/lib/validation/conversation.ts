@@ -31,6 +31,13 @@ const createMessageSchema = z.object({
   conversationId: uuidSchema,
   senderType: z.enum(messageSenderTypeValues),
   content: z.string().trim().min(1, "الرسالة فارغة").max(4096),
+  /**
+   * Transport-owned receive timestamp (PROMPT-19): an inbound message may
+   * carry the time it actually arrived on WhatsApp so threads keep true
+   * ordering across webhook retries. Omitted for UI/server-generated
+   * writes, which fall back to the DB default (now).
+   */
+  createdAt: z.date().optional(),
 });
 
 export type CreateConversationDto = z.infer<typeof createConversationSchema>;
