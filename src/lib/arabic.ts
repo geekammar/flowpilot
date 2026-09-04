@@ -56,3 +56,11 @@ export const SEARCH_RESULT_NOUNS: ArabicCountNouns = {
   few: "نتائج",
   many: "نتيجة",
 };
+
+export const SLOT_NOUNS: ArabicCountNouns = {
+  zero: "لا توجد أوقات متاحة",
+  one: "وقت واحد متاح",
+  two: "وقتان متاحان",
+  few: "أوقات متاحة",
+  many: "وقتاً متاحاً",
+};

@@ -2,7 +2,8 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-11 (Smart Create Appointment Foundation).
+> Last updated: PROMPT-12 (Smart Create Appointment — Step 4:
+> Available-Slot Selection).
 
 ## Prompt 01 — Repository Foundation
 
@@ -2840,6 +2841,245 @@ foundation`; `package.json` version bumped to 0.10.0 (MINOR — new
 
 ---
 
+## PROMPT-12 — Smart Create Appointment: Available-Slot Selection (Step 4)
+
+**Status:** ✅ Complete
+
+> Operator prompt: SMART CREATE APPOINTMENT — AVAILABLE SLOT SELECTION
+> (STEP 4 ONLY). Replaces the interim manual time-entry details screen
+> with real available-slot selection consuming the EXISTING PROMPT-10
+> availability layer. The flow is now العميل → الخدمة → التاريخ → الوقت
+> with المراجعة/التأكيد locked. Step 4 is SELECTION ONLY — no
+> appointment is created from it (review/confirmation are later prompts).
+> Zero schema changes; the availability algorithm untouched.
+
+### PLAN
+
+1. Reuse `getAvailabilityAction` verbatim — no second availability
+   engine, no scheduling-logic changes (none were needed).
+2. Extend the flow constants/types: `BOOKING_FLOW_ACTIVE_STEPS = 4`,
+   screen `"slot"` replaces the interim `"details"`, add the typed
+   `SelectedSlot` ({startTime, endTime} "HH:mm" — the appointment
+   domain's own wall-clock conventions) for PROMPT-13 to consume.
+3. Pure presentation helpers (`slot-helpers.ts`): Arabic time
+   formatting, morning/afternoon/evening grouping, stale-selection
+   membership check, timezone label — display-only; every displayed
+   slot comes from the server result.
+4. Step 4 component (`slot-step.tsx`) with four distinct states
+   (loading / slots / no-slots-with-reason / failure) over TanStack
+   Query, keyed by serviceId+date.
+5. Wizard container: `selectedSlot` state cleared on service/date
+   change; remove the interim details screen + its schema (minimum
+   replacement, nothing unrelated).
+6. Verify via a temporary offline harness (in-memory stand-ins running
+   the REAL availability service + source-level checks), then the full
+   quality gates; update docs; commit/tag/publish.
+
+### TODO Completion
+
+- [x] Read Tier 0 + task-relevant docs (vision, strategy, architecture,
+      SPEC_A, roadmap, decisions, build state, design system, UX plan,
+      database, current state, project status, appointments README)
+- [x] Inspect the PROMPT-11 wizard + the PROMPT-10 availability layer
+      (reused, NOT rebuilt — algorithm untouched)
+- [x] `types.ts`: `BOOKING_FLOW_ACTIVE_STEPS = 4`, screen `"slot"`,
+      `SelectedSlot`
+- [x] `slot-helpers.ts` pure presentation helpers
+- [x] `slot-step.tsx` Step 4 slot-selection UI
+- [x] Wizard container: selectedSlot state + invalidation on
+      service/date change + step-4 navigation
+- [x] Progress indicator: steps 1–4 active, 5–6 locked, slot completion
+- [x] Interim details screen + `bookingDetailsFormSchema` removed
+- [x] `SLOT_NOUNS` in `src/lib/arabic.ts`
+- [x] Temporary verification harness (89/89 checks) — created, run,
+      removed
+- [x] Quality gates: db:generate / lint / typecheck / format:check /
+      verify / security
+- [x] Docs: appointments README / BUILD_STATE / CURRENT_STATE /
+      PROJECT_STATUS; version → 0.11.0
+- [x] Release: commit + annotated tag v0.11.0 + push + GitHub Release
+
+### ALREADY PRESENT / REUSED (untouched in spirit)
+
+- The ENTIRE PROMPT-10 availability layer: `getAvailabilityInputSchema`
+  (`{date, serviceId}` only — hostile keys Zod-stripped),
+  `getAvailability` (deterministic slots from working hours, stored
+  timezone, canonical `slotDurationMinutes` step, service-duration fit,
+  the exact write-path conflict rule), `getAvailabilityAction` (thin
+  `"use server"` hook building the actor from the session — the
+  Business is ALWAYS derived server-side), and the typed result
+  contract with explicit no-slots reasons — all consumed verbatim, zero
+  algorithm changes
+- The PROMPT-11 wizard mechanics: customer/service/date steps, progress
+  indicator conventions (locked steps, clickable completed steps),
+  container-only state, per-step continue gating, TanStack Query
+  provider
+- `formatArabicDate` (date-format.ts), `EmptyState`, `Button`,
+  `Skeleton`, `arabicCount` + nouns pattern, `appointmentDateSchema`,
+  logical-CSS/design-system tokens
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **`SelectedSlot`** — the typed Step 4 output mirroring the appointment
+  domain's wall-clock conventions ("HH:mm" start/end); stored in the
+  wizard's existing local state model for PROMPT-13 (review) to
+  consume. No appointment is created from Step 4 and `createAppointment`
+  is never called there.
+- **Step 4 — الوقت** (`slot-step.tsx`): real available-slot selection.
+  TanStack Query calls `getAvailabilityAction({date, serviceId})` ONLY
+  while the step is mounted with a valid date (query key carries both
+  inputs, so changing either refetches instead of showing stale times;
+  no `keepPreviousData` — a stale slot list can never flash). Four
+  states: loading (skeleton + `aria-busy` + sr-only status), slots
+  (grouped الصباح/بعد الظهر/المساء chips — pure client-side grouping
+  of server-provided slots, chronological order preserved; large
+  h-11 touch targets, flex-wrap, 360px-safe; `aria-pressed` selection
+  with a check icon; `aria-live` slot count; business-timezone label
+  from the result), zero slots (the EXPLICIT reason rendered as clear
+  Arabic copy: BUSINESS_CLOSED / SERVICE_TOO_LONG / FULLY_BOOKED, with
+  actionable next steps — تغيير التاريخ always, تغيير الخدمة for
+  SERVICE_TOO_LONG — never fake or speculative times), and failure
+  (`role="alert"` + إعادة المحاولة, plus العودة إلى الخدمات for the
+  service-related typed errors SERVICE_NOT_FOUND/SERVICE_INACTIVE).
+  The selected date stays visible (long Arabic date + تغيير التاريخ
+  quick action). A `role="status"` confirmation panel shows the chosen
+  range once a valid selection exists.
+- **Stale-selection protection** (two layers): the wizard container
+  clears `selectedSlot` whenever the service or the date CHANGES
+  (changing the customer does not — availability does not depend on
+  it), and `slotExistsIn` membership in the CURRENT result is the
+  defensive backstop before treating a slot as selected.
+- **Wizard mechanics preserved** (PROMPT-11 rules): customer/service/
+  date selections persist across back/forward navigation; Step 4
+  becomes active after valid Step 3; Steps 5/6 remain locked; completed
+  earlier steps stay navigable; exactly one primary action on the
+  active step (the slot selection itself — there is deliberately NO
+  continue action past Step 4 while steps 5–6 are locked); no
+  accidental wizard reset.
+- **Interim bridge removed**: `booking-details-step.tsx` (manual
+  start-time entry) and its `bookingDetailsFormSchema` deleted — the
+  manual time entry is no longer part of the Smart Create path and no
+  competing primary booking path remains. Nothing unrelated was
+  touched (`createAppointment` and every other appointment capability
+  remain intact for their existing callers).
+
+### NOT IMPLEMENTED (later prompts — per scope)
+
+- Step 5 (review) and Step 6 (confirmation) — PROMPT-13+ consumes the
+  preserved `SelectedSlot`; the wizard intentionally ends at slot
+  selection for now
+- Reminder messages, WhatsApp booking, AI booking, customer creation,
+  customers directory, rescheduling UX, cancellation UX, agenda
+  redesign, team management, staff activation, new availability
+  algorithms — all out of scope
+
+### Generated / Changed Files
+
+`src/features/appointments/components/smart-create/{slot-step,slot-helpers}.tsx`-family
+(new `slot-step.tsx`, new `slot-helpers.ts`); updated
+`src/features/appointments/components/smart-create/{smart-create-appointment,booking-flow-progress}.tsx`,
+`src/features/appointments/types.ts` (ACTIVE_STEPS=4, screen `"slot"`,
+`SelectedSlot`), `src/features/appointments/schemas/booking-flow-schema.ts`
+(interim form schema removed), `src/lib/arabic.ts` (+`SLOT_NOUNS`),
+`src/app/(app)/appointments/new/page.tsx` (copy only); removed
+`src/features/appointments/components/smart-create/booking-details-step.tsx`;
+`src/features/appointments/README.md`; `package.json` (version →
+0.11.0). No schema/migration changes.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..11 pattern): **89/89 checks passed** offline — in-memory
+  repository stand-ins running the REAL availability service + schemas
+  (valid result with 15 slots, exact first/last slot boundaries,
+  ascending order, HH:mm shape, timezone in result; grouping into
+  morning/afternoon/evening preserving every server slot exactly once
+  with empty groups omitted; empty result with explicit reason;
+  BUSINESS_CLOSED / SERVICE_TOO_LONG / FULLY_BOOKED each reproduced;
+  invalid date/UUID/non-object input → INVALID_INPUT, no-business →
+  NO_BUSINESS; hostile `businessId`/`role` payload keys stripped with
+  the business resolved from the ACTOR only (call-log verified); STAFF
+  actor reads the same availability; cross-tenant service →
+  SERVICE_NOT_FOUND both directions and foreign blocking appointments
+  never affect slots; inactive → SERVICE_INACTIVE, deleted →
+  SERVICE_NOT_FOUND; date change (Monday 17:00 slot not offered
+  Saturday) and service change (45-min 17:00 slot not offered for a
+  90-min service) both invalidate a prior selection via the same
+  membership guard the UI uses) + source-level checks (container
+  clears the slot on service/date change and ONLY there — navigation
+  never resets it; slot lives in container state; smart-create files
+  never import the create action while `createAppointment` stays
+  intact for its existing callers; screen union exactly the four
+  active steps, progress locks > BOOKING_FLOW_ACTIVE_STEPS, no
+  review/confirm screens, no continue action on the slot screen;
+  interim screen + schema gone; chips flex-wrap with no fixed grid and
+  no width > 6rem, h-11 targets, truncation-safe rows; aria-pressed /
+  aria-label / aria-live / role=status / role=alert / aria-busy /
+  aria-current / aria-disabled all present; no physical left/right
+  CSS; no console logging; page derives the Business server-side and
+  redirects without one; client availability input carries only
+  {date, serviceId}).
+- `pnpm db:generate` ✅ · `pnpm lint` ✅ · `pnpm typecheck` ✅ ·
+  `pnpm format:check` ✅
+- `pnpm verify` full gate: PASSED ✅ (lint 49.5s · typecheck 23.2s ·
+  format 33.3s · build --webpack 270.7s) — `/appointments/new` compiled
+  as a dynamic route
+- `pnpm security` ✅ (clean)
+- NOT verified on-device (environment limits, honestly stated):
+  live-database behavior of the availability read through the running
+  wizard (this device has a placeholder `DATABASE_URL` and cannot run
+  the Prisma schema engine). The real-DB path is the existing
+  `AppointmentRepository.listBlockingForDate` conventions already used
+  by the availability service; the workflow logic was verified offline
+  with the REAL service code against in-memory stand-ins.
+
+### Known Limitations
+
+- The Smart Create flow currently ENDS at slot selection: the chosen
+  slot is preserved in wizard state, but review (Step 5) and
+  confirmation (Step 6) do not exist yet, so no appointment can be
+  created from the wizard until PROMPT-13 lands. The confirmation
+  panel states this honestly; steps 5–6 stay locked in the indicator.
+- Availability is a READ layer (unchanged PROMPT-10 caveat): the slot
+  is not reserved; two concurrent bookings for the same slot still
+  rely on the transactional conflict check at write time — relevant
+  once creation lands.
+- Slot chips display the start time only (the full range is in the
+  aria-label and the selection panel) — the service duration is shown
+  in the step-2 selection summary.
+- Returning to Step 4 refetches availability on mount (fresh server
+  truth); if a previously selected slot disappeared because someone
+  else booked it, the selection clears silently and the count
+  re-announces — acceptable at pilot scale.
+
+### Database / Migration State
+
+- **NO schema change.** The existing Business/Service/Appointment
+  models fully support slot selection. Existing unapplied-on-device
+  migrations (`20260902120000`, `20260903120000`, `20260903130000`,
+  `20260903140000`) remain a desktop/CI `pnpm db:deploy` action,
+  unchanged by this prompt.
+
+### Release
+
+- Commit `feat(appointments): add available slot selection`;
+  `package.json` version bumped to 0.11.0 (MINOR — new user-facing
+  product capability; `/api/health` reports the version).
+- Annotated tag `v0.11.0` — Smart Create Appointment: Available-Slot
+  Selection (Step 4) — points at the PROMPT-12 commit. Published
+  through the documented GitHub publication workflow (PROMPT-05A..11
+  pattern: git state → origin identity → gh auth → push main → verify
+  tag target → push tag only → `gh release create --verify-tag` →
+  verify release published). The legacy `pnpm release` doctor gate
+  still blocks on this device's placeholder `DATABASE_URL`
+  (device-local, user action) and was not used, per the operator's
+  prompt instruction.
+- **Next step (product):** PROMPT-13 — Smart Create Appointment: Step
+  5 Review (consumes the preserved `SelectedSlot` from the wizard
+  state; confirmation follows). Do NOT implement it in this prompt.
+
+---
+
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
   to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
   العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
@@ -2985,9 +3225,10 @@ password}` input and typed Arabic error mapping, safe sign-in →
   (`AppointmentRepository.listBlockingForDate`, the only new repository
   primitive). Typed result contract with explicit no-slots reasons
   (BUSINESS_CLOSED/SERVICE_TOO_LONG/FULLY_BOOKED) and typed Arabic
-  error codes; `getAvailabilityAction` is the thin server-action hook
-  for PROMPT-11 Smart Create. Zero schema changes, no UI, verified
-  offline 36/36 with in-memory stand-ins running the real service code.
+  error codes; `getAvailabilityAction` is the thin server-action hook,
+  consumed by Smart Create Step 4 (PROMPT-12). Zero schema changes,
+  no UI of its own, verified offline 36/36 with in-memory stand-ins
+  running the real service code.
 - **Smart create appointment foundation (PROMPT-11) complete:** the first
   three steps of the Smart Create flow at `/appointments/new` — العميل
   (debounced name/phone search through the existing customer repository
@@ -2998,16 +3239,30 @@ password}` input and typed Arabic error mapping, safe sign-in →
   inside a 6-step progress indicator where only steps 1–3 are active and
   completed steps are clickable for safe back-navigation. Wizard state is
   `{customerId, serviceId, date}` in one client container (no global
-  store; TanStack Query for the search — its first consumer). The
-  appointment-creation capability is preserved through an INTERIM details
-  screen (time + note + create) reusing the existing `createAppointment`
-  action, until available-slot selection (PROMPT-12) replaces it. Zero
+  store; TanStack Query for the search — its first consumer). Zero
   schema changes; PROMPT-10 availability layer untouched; verified offline
-  60/60 with in-memory stand-ins running the real service code.
-- **Next Step:** PROMPT-12 — Smart Create Appointment: Available-Slot
-  Selection (Step 4) — consumes the deterministic availability layer
-  through `getAvailabilityAction` and replaces the interim details
-  screen. Do NOT combine unrelated areas. After that, the remaining Spec
-  A placeholders (customers directory, business knowledge screen, team,
-  staff area) proceed per the operator's choice.
+  60/60 with in-memory stand-ins running the real service code. (The
+  interim manual-time details screen this prompt shipped was REPLACED by
+  PROMPT-12 Step 4.)
+- **Smart create step 4 — available-slot selection (PROMPT-12) complete:**
+  الوقت is now real available-slot selection consuming the PROMPT-10
+  availability layer through `getAvailabilityAction` verbatim (no second
+  engine, zero algorithm changes). Four UI states (loading / grouped
+  morning-afternoon-evening chips / zero-slots with the explicit reason
+  as clear Arabic copy + actionable next steps / failure with retry),
+  360px-safe flex-wrap chips with aria-pressed selection and aria-live
+  counts, business-timezone label, and the selected date always visible.
+  The typed `SelectedSlot` lives in the wizard's container state and is
+  cleared when the service or date changes (membership-in-current-result
+  backstop); customer changes do not clear it. Step 4 is SELECTION ONLY —
+  no appointment is created from it — and the interim manual time-entry
+  screen was removed, so the flow deliberately ends at slot selection
+  until PROMPT-13 (review) consumes the preserved slot. Steps 5–6 remain
+  locked. Zero schema changes; verified offline 89/89 with in-memory
+  stand-ins running the real service code + source-level checks.
+- **Next Step:** PROMPT-13 — Smart Create Appointment: Step 5 Review —
+  consumes the preserved `SelectedSlot` from the wizard state (then Step
+  6 confirmation). Do NOT combine unrelated areas. After that, the
+  remaining Spec A placeholders (customers directory, business knowledge
+  screen, team, staff area) proceed per the operator's choice.
 - After each prompt: update this file and `DECISIONS.md`.

@@ -1,14 +1,15 @@
 "use client";
 
-import { BookingDetailsStep } from "@/features/appointments/components/smart-create/booking-details-step";
 import { BookingFlowProgress } from "@/features/appointments/components/smart-create/booking-flow-progress";
 import { CustomerStep } from "@/features/appointments/components/smart-create/customer-step";
 import { DateStep } from "@/features/appointments/components/smart-create/date-step";
 import { ServiceStep } from "@/features/appointments/components/smart-create/service-step";
+import { SlotStep } from "@/features/appointments/components/smart-create/slot-step";
 import type {
   BookingCustomerOption,
   BookingFlowScreen,
   BookingServiceOption,
+  SelectedSlot,
 } from "@/features/appointments/types";
 import { Button } from "@/components/ui/button";
 import { appointmentDateSchema } from "@/lib/validation";
@@ -17,10 +18,8 @@ import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-type SelectionStep = Exclude<BookingFlowScreen, "details">;
-
 const STEP_HEADINGS: Record<
-  SelectionStep,
+  BookingFlowScreen,
   { title: string; description: string }
 > = {
   customer: {
@@ -35,19 +34,24 @@ const STEP_HEADINGS: Record<
     title: "متى الموعد؟",
     description: "اختر يوماً قريباً أو حدّد تاريخاً آخر.",
   },
+  slot: {
+    title: "أي وقت يناسب الموعد؟",
+    description: "اختر وقتاً من الأوقات المتاحة فعلياً في اليوم المحدد.",
+  },
 };
 
 /**
- * Smart Create Appointment flow (PROMPT-11 — Steps 1–3 foundation).
+ * Smart Create Appointment flow (PROMPT-11 Steps 1–3 + PROMPT-12 Step 4).
  *
- * العميل → الخدمة → التاريخ, with a 6-step progress indicator where
- * only steps 1–3 are active (الوقت/المراجعة/التأكيد arrive in later
+ * العميل → الخدمة → التاريخ → الوقت, with a 6-step progress indicator
+ * where steps 1–4 are active (المراجعة/التأكيد stay locked until later
  * prompts). Selections live in this container only — moving back and
- * forth never resets them, and each step's continue action stays
- * disabled until its selection is valid. The interim details screen
- * (time + note + create) completes today's booking path through the
- * existing `createAppointment` action until available-slot selection
- * lands.
+ * forth never resets them. Step 4 consumes the existing availability
+ * layer through `getAvailabilityAction` and is SELECTION ONLY: the
+ * chosen slot is preserved here for the future review step, and no
+ * appointment is created from it. Changing the service or the date
+ * clears the slot selection — a stale slot can never survive an
+ * input change it was not computed for.
  */
 export function SmartCreateAppointment({
   initialCustomers,
@@ -67,60 +71,54 @@ export function SmartCreateAppointment({
   const [customer, setCustomer] = useState<BookingCustomerOption | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [date, setDate] = useState(defaultDate);
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
 
   const service = services.find((item) => item.id === serviceId) ?? null;
   const dateIsValid = appointmentDateSchema.safeParse(date).success;
-  const detailsReady =
-    screen === "details" && customer !== null && service !== null;
 
-  if (detailsReady && customer && service) {
-    return (
-      <div className="space-y-6">
-        <header className="space-y-1">
-          <h2 className="text-base font-semibold">أكمل الحجز</h2>
-          <p className="text-sm text-muted-foreground">
-            حدّد وقت البداية وأضف ملاحظة إن لزم، ثم أنشئ الموعد.
-          </p>
-        </header>
-        <BookingDetailsStep
-          customer={customer}
-          service={service}
-          date={date}
-          onBack={() => setScreen("date")}
-        />
-      </div>
-    );
+  /** Changing the service invalidates any slot chosen for another one. */
+  function handleSelectService(nextServiceId: string) {
+    if (nextServiceId !== serviceId) setSelectedSlot(null);
+    setServiceId(nextServiceId);
   }
 
-  // Defensive: the details screen is unreachable without selections
-  // (continue is gated); fall back to the date step.
-  const activeScreen: SelectionStep = detailsReady
-    ? "date"
-    : screen === "details"
-      ? "date"
-      : screen;
+  /** Changing the date invalidates any slot chosen for another day. */
+  function handleSelectDate(nextDate: string) {
+    if (nextDate !== date) setSelectedSlot(null);
+    setDate(nextDate);
+  }
+
   const currentStep =
-    activeScreen === "customer" ? 1 : activeScreen === "service" ? 2 : 3;
+    screen === "customer"
+      ? 1
+      : screen === "service"
+        ? 2
+        : screen === "date"
+          ? 3
+          : 4;
 
   const canContinue =
-    activeScreen === "customer"
+    screen === "customer"
       ? customer !== null
-      : activeScreen === "service"
+      : screen === "service"
         ? serviceId !== null
-        : dateIsValid;
+        : screen === "date"
+          ? dateIsValid
+          : false;
 
   function goNext() {
-    if (activeScreen === "customer") setScreen("service");
-    else if (activeScreen === "service") setScreen("date");
-    else setScreen("details");
+    if (screen === "customer") setScreen("service");
+    else if (screen === "service") setScreen("date");
+    else if (screen === "date") setScreen("slot");
   }
 
   function goBack() {
-    if (activeScreen === "service") setScreen("customer");
-    else if (activeScreen === "date") setScreen("service");
+    if (screen === "service") setScreen("customer");
+    else if (screen === "date") setScreen("service");
+    else if (screen === "slot") setScreen("date");
   }
 
-  const heading = STEP_HEADINGS[activeScreen];
+  const heading = STEP_HEADINGS[screen];
 
   return (
     <div className="space-y-6">
@@ -130,9 +128,18 @@ export function SmartCreateAppointment({
           customer: customer !== null,
           service: serviceId !== null,
           date: dateIsValid,
+          slot: selectedSlot !== null,
         }}
         onSelectStep={(step) =>
-          setScreen(step === 1 ? "customer" : step === 2 ? "service" : "date")
+          setScreen(
+            step === 1
+              ? "customer"
+              : step === 2
+                ? "service"
+                : step === 3
+                  ? "date"
+                  : "slot",
+          )
         }
       />
 
@@ -140,13 +147,13 @@ export function SmartCreateAppointment({
         الخطوة الحالية: {heading.title}
       </span>
 
-      {customer && activeScreen !== "customer" ? (
+      {customer && screen !== "customer" ? (
         <dl className="space-y-1.5 rounded-xl border bg-muted/40 px-4 py-3 text-sm">
           <div className="flex items-center justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">العميل</dt>
             <dd className="truncate font-medium">{customer.name}</dd>
           </div>
-          {service && activeScreen === "date" ? (
+          {service && (screen === "date" || screen === "slot") ? (
             <div className="flex items-center justify-between gap-3">
               <dt className="shrink-0 text-muted-foreground">الخدمة</dt>
               <dd className="truncate font-medium">
@@ -165,26 +172,39 @@ export function SmartCreateAppointment({
           <p className="text-sm text-muted-foreground">{heading.description}</p>
         </header>
 
-        {activeScreen === "customer" ? (
+        {screen === "customer" ? (
           <CustomerStep
             initialCustomers={initialCustomers}
             selected={customer}
             onSelect={setCustomer}
           />
-        ) : activeScreen === "service" ? (
+        ) : screen === "service" ? (
           <ServiceStep
             services={services}
             selectedId={serviceId}
-            onSelect={setServiceId}
+            onSelect={handleSelectService}
             canManageServices={canManageServices}
           />
-        ) : (
-          <DateStep selectedDate={date} today={today} onSelect={setDate} />
-        )}
+        ) : screen === "date" ? (
+          <DateStep
+            selectedDate={date}
+            today={today}
+            onSelect={handleSelectDate}
+          />
+        ) : service ? (
+          <SlotStep
+            serviceId={service.id}
+            date={date}
+            selectedSlot={selectedSlot}
+            onSelectSlot={setSelectedSlot}
+            onGoToDate={() => setScreen("date")}
+            onGoToService={() => setScreen("service")}
+          />
+        ) : null}
       </section>
 
       <div className="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:justify-end">
-        {activeScreen === "customer" ? (
+        {screen === "customer" ? (
           <Button asChild type="button" variant="outline">
             <Link href={`/appointments?date=${date}`}>
               <ArrowRightIcon />
@@ -197,9 +217,14 @@ export function SmartCreateAppointment({
             رجوع
           </Button>
         )}
-        <Button type="button" disabled={!canContinue} onClick={goNext}>
-          التالي
-        </Button>
+        {/* Steps 5–6 stay locked: Step 4 is selection only (the slot is
+            preserved for the future review step), so it has no continue
+            action yet. */}
+        {screen !== "slot" ? (
+          <Button type="button" disabled={!canContinue} onClick={goNext}>
+            التالي
+          </Button>
+        ) : null}
       </div>
     </div>
   );

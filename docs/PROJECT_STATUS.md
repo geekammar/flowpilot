@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-11 —
-> Smart Create Appointment Foundation, Steps 1–3).
+> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-12 —
+> Smart Create Appointment: Available-Slot Selection, Step 4).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -33,7 +33,8 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Business settings — identity + booking behavior (PROMPT-09)  | ✅ complete                            |
 | Availability domain/service foundation (PROMPT-10)           | ✅ complete (service layer, no UI)     |
 | Smart Create flow Steps 1–3 (PROMPT-11)                      | ✅ complete                            |
-| Smart Create Steps 4–6 (slot/review/confirm)                 | ⏳ next product slice                  |
+| Smart Create Step 4 — available-slot selection (PROMPT-12)   | ✅ complete                            |
+| Smart Create Steps 5–6 (review/confirm)                      | ⏳ next product slice                  |
 | Customers directory                                          | ⏳ placeholder (oldest remaining)      |
 | Business knowledge screen                                    | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
@@ -94,23 +95,33 @@ for the Smart Create flow. Zero schema changes; verified offline 36/36
 with in-memory stand-ins running the real service code.
 Smart Create Appointment Steps 1–3 (PROMPT-11) are now implemented:
 `/appointments/new` is a step flow (العميل → الخدمة → التاريخ) with a
-6-step progress indicator where only steps 1–3 are active. Step 1
-searches customers by name or phone (debounced, tenant-scoped server
-action over the existing customer repository search primitive, with
-empty/selected/change states); Step 2 lists active services only as
-radio-cards; Step 3 offers a 14-day quick-pick strip from
-business-timezone today plus a native date input validated by the
-shared date schema — NO availability calculation (Step 4 consumes the
-PROMPT-10 layer in the next prompt). Selections live in one client
-container and never reset on back-navigation; the appointment-creation
-capability is preserved through an interim details screen (time + note
-
-- create) reusing the existing `createAppointment` action until
-  available-slot selection lands. Zero schema changes; verified offline
-  60/60 with in-memory stand-ins running the real service code.
-  Not yet implemented:
-  token delivery, invitation creation UI (Team management), and the
-  STAFF activation workflow.
+6-step progress indicator. Step 1 searches customers by name or phone
+(debounced, tenant-scoped server action over the existing customer
+repository search primitive, with empty/selected/change states); Step 2
+lists active services only as radio-cards; Step 3 offers a 14-day
+quick-pick strip from business-timezone today plus a native date input
+validated by the shared date schema. Selections live in one client
+container and never reset on back-navigation. Smart Create Step 4
+(PROMPT-12) is now implemented too: الوقت is REAL available-slot
+selection consuming the PROMPT-10 availability layer through
+`getAvailabilityAction` verbatim (no second engine, zero algorithm or
+schema changes). Every displayed time comes from the server result; the
+request runs only while the step is mounted with a valid date + service.
+Four UI states: loading, grouped morning/afternoon/evening chips
+(360px-safe, aria-pressed selection, aria-live count,
+business-timezone label, selected date always visible), zero slots with
+the EXPLICIT reason as clear Arabic copy plus actionable next steps
+(BUSINESS_CLOSED / SERVICE_TOO_LONG / FULLY_BOOKED), and failure with
+retry. The typed `SelectedSlot` lives in the wizard's container state,
+is cleared when service or date changes, and is preserved for the
+future review step — Step 4 is SELECTION ONLY (no appointment is
+created from it; the interim manual time-entry screen was removed, so
+the flow deliberately ends at slot selection while steps 5–6 stay
+locked). Verified offline 89/89 with in-memory stand-ins running the
+real service code + source-level checks.
+Not yet implemented: Smart Create Steps 5–6 (review/confirmation),
+token delivery, invitation creation UI (Team management), and the
+STAFF activation workflow.
 
 Ops (non-product) passes complete: Ops 01 run/reproducibility, Ops 02 health
 verification + commit safety, Ops 03 release engineering, Ops 04 Vercel
@@ -246,16 +257,26 @@ availability foundation`); the tag is pushed to origin and the
   (device-local, user action) and was not used, per the operator's
   instruction.
 - **v0.10.0 — Smart Create Appointment Foundation (Steps 1–3):
-  PUBLISHED** (2026-09-04, PROMPT-11 — current Latest release).
+  PUBLISHED** (2026-09-04, PROMPT-11).
   Annotated tag `v0.10.0` points at the PROMPT-11 commit
   (`feat(appointments): add smart create appointment flow
 foundation`); the tag is pushed to origin and the GitHub Release
   "FlowPilot v0.10.0 — Smart Create Appointment Foundation" exists.
   Published through the documented GitHub publication workflow
-  (PROMPT-05A..10 pattern); the legacy `pnpm release` doctor gate
-  still blocks on this device's placeholder `DATABASE_URL`
+  (PROMPT-05A..10 pattern); the legacy `pnpm release` doctor gate still
+  blocks on this device's placeholder `DATABASE_URL`
   (device-local, user action) and was not used, per the operator's
   instruction.
+- **v0.11.0 — Smart Create Appointment: Available-Slot Selection
+  (Step 4): PUBLISHED** (2026-09-04, PROMPT-12 — current Latest
+  release). Annotated tag `v0.11.0` points at the PROMPT-12 commit
+  (`feat(appointments): add available slot selection`); the tag is
+  pushed to origin and the GitHub Release "FlowPilot v0.11.0 — Smart
+  Create Appointment: Available-Slot Selection" exists. Published
+  through the documented GitHub publication workflow (PROMPT-05A..11
+  pattern); the legacy `pnpm release` doctor gate still blocks on this
+  device's placeholder `DATABASE_URL` (device-local, user action) and
+  was not used, per the operator's instruction.
 - Publication history was reconciled by PROMPT-05A (operations-only):
   local `main` was already current on origin (no commit push needed);
   the three missing tags were pushed normally (no force) and the
@@ -271,11 +292,10 @@ foundation`); the tag is pushed to origin and the GitHub Release
 
 ## Next Spec
 
-**Finish Spec A first.** Recommended next product slice: **PROMPT-12 —
-Smart Create Appointment: Available-Slot Selection (Step 4)** — consumes
-the PROMPT-10 availability layer through `getAvailabilityAction` and
-replaces the interim details screen, followed by review/confirm
-(Steps 5–6). Then the remaining
+**Finish Spec A first.** Recommended next product slice: **PROMPT-13 —
+Smart Create Appointment: Step 5 Review** — consumes the preserved
+`SelectedSlot` from the wizard state (then Step 6 confirmation). Then
+the remaining
 placeholders (customers directory → business knowledge screen → team,
 which includes the STAFF invitation/activation UX composing the
 existing invitation services; then staff area). Spec A exit criteria

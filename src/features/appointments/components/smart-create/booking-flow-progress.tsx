@@ -11,8 +11,8 @@ import { CheckIcon, LockIcon } from "lucide-react";
 /**
  * Progress indicator for the Smart Create Appointment flow. Shows the
  * intended 6-step flow (العميل → الخدمة → التاريخ → الوقت → المراجعة
- * → التأكيد) with only steps 1–3 active in this release; steps 4–6
- * stay locked. Completed steps are clickable for safe back-navigation
+ * → التأكيد) with steps 1–4 active in this release; steps 5–6 stay
+ * locked. Completed steps are clickable for safe back-navigation
  * (the onboarding-wizard convention) — selections are preserved.
  */
 export function BookingFlowProgress({
@@ -20,19 +20,27 @@ export function BookingFlowProgress({
   completedSteps,
   onSelectStep,
 }: {
-  /** 1-based index of the active step (only 1–3 are ever active). */
-  currentStep: 1 | 2 | 3;
-  /** Which of the first three steps already hold a valid selection. */
-  completedSteps: { customer: boolean; service: boolean; date: boolean };
-  /** Navigate back to a completed step (never forward). */
-  onSelectStep: (step: 1 | 2 | 3) => void;
+  /** 1-based index of the active step (only 1–4 are ever active). */
+  currentStep: 1 | 2 | 3 | 4;
+  /** Which of the first four steps already hold a valid selection. */
+  completedSteps: {
+    customer: boolean;
+    service: boolean;
+    date: boolean;
+    slot: boolean;
+  };
+  /** Navigate back to a completed step (never forward past an
+   * incomplete one). */
+  onSelectStep: (step: 1 | 2 | 3 | 4) => void;
 }) {
   const stepCompleted = (index: number) =>
     index === 0
       ? completedSteps.customer
       : index === 1
         ? completedSteps.service
-        : completedSteps.date;
+        : index === 2
+          ? completedSteps.date
+          : completedSteps.slot;
 
   return (
     <nav aria-label="خطوات إنشاء الموعد">
@@ -41,7 +49,8 @@ export function BookingFlowProgress({
           const stepNumber = index + 1;
           const locked = stepNumber > BOOKING_FLOW_ACTIVE_STEPS;
           const current = stepNumber === currentStep;
-          const complete = stepNumber <= 3 && stepCompleted(index);
+          const complete =
+            stepNumber <= BOOKING_FLOW_ACTIVE_STEPS && stepCompleted(index);
           const clickable = complete && !current;
 
           const circle = (
@@ -70,7 +79,7 @@ export function BookingFlowProgress({
               {clickable ? (
                 <button
                   type="button"
-                  onClick={() => onSelectStep(stepNumber as 1 | 2 | 3)}
+                  onClick={() => onSelectStep(stepNumber as 1 | 2 | 3 | 4)}
                   aria-label={`العودة إلى خطوة: ${step.label}`}
                   className="flex h-12 w-full flex-col items-center justify-center gap-1 border-b-2 border-transparent text-muted-foreground transition-colors hover:text-primary"
                 >

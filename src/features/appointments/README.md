@@ -2,7 +2,7 @@
 
 Booking lifecycle: creation, confirmation, rescheduling, cancellation, reminders,
 deterministic availability (PROMPT-10), and the Smart Create Appointment flow
-foundation (PROMPT-11 — Steps 1–3).
+(PROMPT-11 Steps 1–3 + PROMPT-12 Step 4 — available-slot selection).
 
 ## Isolation rules
 
@@ -20,18 +20,17 @@ foundation (PROMPT-11 — Steps 1–3).
 - `actions/appointment-actions.ts` — create/status/reschedule writes
   (tenant-scoped, conflict-checked, status transitions enforced).
 - `actions/availability-actions.ts` — `getAvailabilityAction`: thin
-  `"use server"` read hook for the availability service (the integration
-  point for the future Smart Create flow).
+  `"use server"` read hook for the availability service (consumed by
+  Step 4 of the Smart Create flow).
 - `actions/booking-flow-actions.ts` — `searchBookingCustomersAction`: thin
   `"use server"` wrapper for the booking-flow customer search (Step 1).
 - `schemas/appointment-schema.ts` — form-level Zod inputs for the agenda
   actions.
 - `schemas/availability-schema.ts` — availability request input
   (`{date, serviceId}` ONLY; the Business is never client-controlled —
-  Zod strips every other key).
+  Zod strips every other key). Step 4 consumes this schema verbatim.
 - `schemas/booking-flow-schema.ts` — booking-flow inputs: customer search
-  (`{query}` ONLY — hostile keys stripped) and the interim details form
-  (startTime + notes).
+  (`{query}` ONLY — hostile keys stripped).
 - `server/appointment-queries.ts` — agenda/detail reads.
 - `server/availability-service.ts` — deterministic availability
   calculation (see Semantics below).
@@ -41,13 +40,14 @@ foundation (PROMPT-11 — Steps 1–3).
 - `hooks/use-debounced-value.ts` — debounce for the search box.
 - `components/smart-create/*` — the Smart Create flow (see below).
 - `types.ts` — agenda/detail/option types, the availability result
-  contract, the 6-step flow constants, and booking-flow option types.
+  contract, the 6-step flow constants, `SelectedSlot`, and booking-flow
+  option types.
 
-## Smart Create flow (PROMPT-11 — Steps 1–3)
+## Smart Create flow (Steps 1–4)
 
 `/appointments/new` is the Smart Create Appointment flow: العميل → الخدمة
-→ التاريخ, shown in a 6-step progress indicator where ONLY steps 1–3 are
-active (الوقت/المراجعة/التأكيد stay locked until later prompts).
+→ التاريخ → الوقت, shown in a 6-step progress indicator where ONLY steps
+1–4 are active (المراجعة/التأكيد stay locked until later prompts).
 
 - **Step 1 — العميل** (`customer-step.tsx`): search by name or phone
   (debounced, `searchBookingCustomersAction` → `searchBookingCustomers`,
@@ -59,17 +59,39 @@ active (الوقت/المراجعة/التأكيد stay locked until later promp
 - **Step 3 — التاريخ** (`date-step.tsx`): a quick-pick strip of the next 14
   days (starting from business-timezone today, server-derived) plus a
   native date input (min = business today). Validation reuses the shared
-  `appointmentDateSchema`. NO availability calculation happens here — the
-  next step will consume the PROMPT-10 availability layer.
+  `appointmentDateSchema`. NO availability calculation happens here.
+- **Step 4 — الوقت** (`slot-step.tsx`, PROMPT-12): REAL available-slot
+  selection consuming the PROMPT-10 availability layer through
+  `getAvailabilityAction` — every displayed time comes from the server
+  result; nothing is invented on the client. The query runs only while
+  the step is mounted with a valid date + service (query key
+  `["booking-availability", serviceId, date]`). Four distinct states:
+  loading (skeleton + sr-only status), slots (grouped
+  الصباح/بعد الظهر/المساء chips, `aria-pressed` selection, `aria-live`
+  count, business-timezone label), zero slots with the explicit reason
+  rendered as clear Arabic copy + actionable next steps (تغيير التاريخ,
+  and تغيير الخدمة for `SERVICE_TOO_LONG`), and failure (`role="alert"`
+  - retry, with العودة إلى الخدمات for service-related typed errors).
+    `slot-helpers.ts` holds the pure presentation helpers (Arabic time
+    formatting, period grouping, stale-selection membership check,
+    timezone label) — display-only; the availability semantics live in the
+    service.
 - **Wizard state** lives in `smart-create-appointment.tsx` only
-  (`customerId`/`serviceId`/`date` + current screen): moving back and forth
-  never resets selections; each step's continue action stays disabled until
-  its selection is valid; completed steps in the progress indicator are
-  clickable for safe back-navigation (onboarding-wizard convention).
-- **Interim details screen** (`booking-details-step.tsx`): NOT one of the 6
-  flow steps — the temporary completion of today's booking path (time +
-  note + create) reusing the existing `createAppointment` action, until
-  available-slot selection (step 4) lands in the next prompt.
+  (`customerId`/`serviceId`/`date`/`selectedSlot` + current screen):
+  moving back and forth never resets selections; each step's continue
+  action stays disabled until its selection is valid; completed steps in
+  the progress indicator are clickable for safe back-navigation
+  (onboarding-wizard convention). Changing the service or the date
+  CLEARS the slot selection (a slot is only valid for the inputs it was
+  computed for); changing the customer does not (availability does not
+  depend on the customer). Step 4 is SELECTION ONLY: the chosen slot is
+  preserved in wizard state for the future review step (PROMPT-13), no
+  appointment is created from it, and there is deliberately no continue
+  action past it while steps 5–6 stay locked.
+
+The interim manual time-entry details screen from PROMPT-11 was REMOVED
+(superseded by Step 4) — the manual start-time entry is no longer part
+of the Smart Create path.
 
 ## Availability semantics (PROMPT-10)
 
