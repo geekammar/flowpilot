@@ -297,6 +297,12 @@ Highlights:
   `lastMessageAt` in one transaction (the only message write path).
 - `AppointmentRepository.hasConflict` — overlap check for scheduling
   (`PENDING`/`CONFIRMED` only, optional staff scope, exclusion-aware).
+- `AppointmentRepository.listBlockingForDate` — availability read
+  (PROMPT-10): tenant-scoped blocking intervals for one date
+  (`PENDING`/`CONFIRMED`, `deletedAt: null`), returned as plain
+  business-local `"HH:mm"` start/end pairs — the read-side twin of the
+  write-path conflict rule, consumed by the appointments availability
+  service.
 - `AppointmentRepository` converts validated `"YYYY-MM-DD"`/`"HH:mm"` strings
   to Prisma `@db.Date`/`@db.Time` values internally.
 - `UserRepository.assignToBusiness` — links an authenticated user during

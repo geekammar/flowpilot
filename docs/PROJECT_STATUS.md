@@ -1,7 +1,7 @@
 # FlowPilot — Project Status
 
-> Point-in-time status snapshot. Date: 2026-09-03 (after PROMPT-09 —
-> Business Settings Foundation).
+> Point-in-time status snapshot. Date: 2026-09-04 (after PROMPT-10 —
+> Smart Availability Foundation).
 > Authoritative ledger: `BUILD_STATE.md`. Evergreen summary: `CURRENT_STATE.md`.
 
 ## Current Spec
@@ -31,6 +31,7 @@ confirmed appointments, sufficient to run paid pilots and collect evidence.
 | Activation → onboarding integration                          | ✅ complete (PROMPT-06)                |
 | Services management (PROMPT-08)                              | ✅ complete                            |
 | Business settings — identity + booking behavior (PROMPT-09)  | ✅ complete                            |
+| Availability domain/service foundation (PROMPT-10)           | ✅ complete (service layer, no UI)     |
 | Customers directory                                          | ⏳ placeholder (oldest remaining)      |
 | Business knowledge screen                                    | ⏳ placeholder                         |
 | Team management (admin)                                      | ⏳ placeholder                         |
@@ -78,6 +79,18 @@ initial status of new appointments. Not yet implemented: default
 appointment duration (no clean domain representation — documented,
 not invented), working-hours editing in settings, account
 activate/deactivate, and the knowledge screen.
+Smart availability (PROMPT-10) is now implemented as a
+service/domain foundation (no UI): `getAvailability` in the
+appointments feature computes deterministic bookable start times from
+the Business's workingHours, stored timezone, canonical
+slotDurationMinutes step, and the service's durationMinutes, filtered
+by the same PENDING/CONFIRMED conflict rule the write path enforces
+(read via the new `AppointmentRepository.listBlockingForDate`
+primitive). Typed result contract with explicit no-slots reasons and
+Arabic error codes; `getAvailabilityAction` is the server-action hook
+for the future Smart Create flow (PROMPT-11). Zero schema changes;
+verified offline 36/36 with in-memory stand-ins running the real
+service code.
 Not yet implemented:
 token delivery, invitation creation UI (Team management), and the
 STAFF activation workflow.
@@ -196,12 +209,22 @@ foundation`); the tag is pushed to origin and the GitHub Release
   device's placeholder `DATABASE_URL` (device-local, user action) and
   was not used, per the operator's instruction.
 - **v0.8.0 — Business Settings Foundation: PUBLISHED** (2026-09-03,
-  PROMPT-09 — current Latest release). Annotated tag `v0.8.0` points
-  at the PROMPT-09 commit (`feat(settings): add business settings
+  PROMPT-09). Annotated tag `v0.8.0` points at
+  the PROMPT-09 commit (`feat(settings): add business settings
 foundation`); the tag is pushed to origin and the GitHub Release
   "FlowPilot v0.8.0 — Business Settings Foundation" exists. Published
   through the documented GitHub publication workflow
   (PROMPT-05A..08 pattern); the legacy `pnpm release` doctor gate
+  still blocks on this device's placeholder `DATABASE_URL`
+  (device-local, user action) and was not used, per the
+  operator's instruction.
+- **v0.9.0 — Smart Availability Foundation: PUBLISHED** (2026-09-04,
+  PROMPT-10 — current Latest release). Annotated tag `v0.9.0` points
+  at the PROMPT-10 commit (`feat(appointments): add deterministic
+availability foundation`); the tag is pushed to origin and the
+  GitHub Release "FlowPilot v0.9.0 — Smart Availability Foundation"
+  exists. Published through the documented GitHub publication workflow
+  (PROMPT-05A..09 pattern); the legacy `pnpm release` doctor gate
   still blocks on this device's placeholder `DATABASE_URL`
   (device-local, user action) and was not used, per the operator's
   instruction.
@@ -220,11 +243,13 @@ foundation`); the tag is pushed to origin and the GitHub Release
 
 ## Next Spec
 
-**Finish Spec A first** (recommended order: customers directory — the
-oldest remaining placeholder — then staff area → settings → team, which
-includes the STAFF invitation/activation UX and composes the existing
-invitation services; next prompt decided by the operator). Spec A exit
-criteria live in `ROADMAP.md`.
+**Finish Spec A first.** Recommended next product slice: **PROMPT-11 —
+Smart Create Appointment Foundation** (consumes the PROMPT-10
+availability layer through `getAvailabilityAction`), then the remaining
+placeholders (customers directory → business knowledge screen → team,
+which includes the STAFF invitation/activation UX composing the
+existing invitation services; then staff area). Spec A exit criteria
+live in `ROADMAP.md`.
 
 After Spec A exit: **Spec B — Evidence Layer + Founder Side** (pilot tracking,
 ROI tracking, vertical registry, evidence logging, founder dashboard).

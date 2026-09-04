@@ -2,7 +2,7 @@
 
 > Evergreen 30-second snapshot for any agent or human arriving cold.
 > Details: `PROJECT_STATUS.md` (point-in-time) · `BUILD_STATE.md` (ledger).
-> Last updated: 2026-09-03 — PROMPT-09 (Business Settings Foundation).
+> Last updated: 2026-09-04 — PROMPT-10 (Smart Availability Foundation).
 
 - **Product:** WhatsApp Appointment Conversion System, Arabic-first/RTL,
   vertical-agnostic. Discovery strategy in Kafr El Sheikh.
@@ -109,6 +109,26 @@ Authentication & Authorization Model`.
   documented (not built): default appointment duration (no clean
   domain representation), working-hours editing in settings, account
   activate/deactivate, knowledge screen.
+- **Smart availability foundation (PROMPT-10): ✅ implemented**
+  (service/domain layer, no UI): deterministic availability in the
+  appointments feature — `getAvailability(deps, actor, {date,
+serviceId})` answers "which start times are actually bookable?" using
+  the Business's existing workingHours week (closed day → zero slots),
+  stored timezone (result carries it; wall-clock "HH:mm" slots), the
+  canonical `slotDurationMinutes` step (reused — no new setting), the
+  service's `durationMinutes` (must fully fit before close), and the
+  exact PENDING/CONFIRMED + not-deleted conflict rule the write path
+  enforces, read through the new repository primitive
+  `AppointmentRepository.listBlockingForDate` (repositories remain the
+  only Prisma consumers). Typed result contract: slots / explicit
+  empty reasons (BUSINESS_CLOSED / SERVICE_TOO_LONG / FULLY_BOOKED) /
+  typed Arabic error codes (SERVICE_INACTIVE, SERVICE_NOT_FOUND,
+  NO_BUSINESS, INVALID_INPUT); hostile businessId overrides are
+  Zod-stripped and the actor's Business is the sole authority.
+  `getAvailabilityAction` ("use server") is the integration hook for
+  PROMPT-11 Smart Create. Zero schema changes; verified offline 36/36
+  checks with in-memory stand-ins running the real service code (no
+  live DB on this device — honestly stated).
 - **Quality:** `pnpm verify` green (lint/typecheck/format/build).
   `pnpm run doctor` NOT READY locally until a real `DATABASE_URL` is set.
 - **Onboarding UX completion (PROMPT-07): ✅ implemented:** 4-step wizard
@@ -148,13 +168,15 @@ vercel:check`, `/api/health`, deployment docs) — superseded/extended by
   via the documented GitHub publication workflow). v0.7.0 — Services
   Management Foundation: published 2026-09-03 (PROMPT-08, same
   workflow). v0.8.0 — Business Settings Foundation: published 2026-09-03
-  (PROMPT-09, same workflow) — every tag is pushed to origin and has a
-  GitHub Release; the newest tag is the current Latest. Local `main`
-  and origin `main` are in sync (see `PROJECT_STATUS.md → Release
-Status`). Open user action: the repo is public but must be private
-  (GITHUB_WORKFLOW.md / DECISIONS #18).
-- **Next step (product):** decided by the operator from the updated
-  BUILD_STATE — natural candidate: Customers Directory (Spec A §11,
-  the oldest remaining placeholder); then business knowledge screen →
-  staff area → team.
+  (PROMPT-09, same workflow). v0.9.0 — Smart Availability Foundation:
+  published 2026-09-04 (PROMPT-10, same workflow) — every tag is pushed
+  to origin and has a GitHub Release; the newest tag is the current
+  Latest. Local `main` and origin `main` are in sync (see
+  `PROJECT_STATUS.md → Release Status`). Open user action: the repo is
+  public but must be private (GITHUB_WORKFLOW.md / DECISIONS #18).
+- **Next step (product):** PROMPT-11 — Smart Create Appointment
+  Foundation, consuming the deterministic availability layer through
+  `getAvailabilityAction`. The remaining Spec A placeholders (customers
+  directory, business knowledge screen, team, staff area) follow per
+  the operator's choice.
 - **Next spec:** B — Evidence Layer (only after Spec A exit criteria).

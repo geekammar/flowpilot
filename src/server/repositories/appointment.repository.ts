@@ -24,6 +24,11 @@ function toTime(time: string): Date {
   return new Date(`1970-01-01T${withSeconds}.000Z`);
 }
 
+/** Epoch-based `@db.Time` value → business-local "HH:mm". */
+function toWallClock(time: Date): string {
+  return time.toISOString().slice(11, 16);
+}
+
 function appointmentRange(input: ListAppointmentsDto) {
   return {
     ...(input.fromDate || input.toDate
@@ -265,6 +270,35 @@ export class AppointmentRepository {
 
   async setStatus(id: string, status: AppointmentStatus) {
     return db.appointment.update({ where: { id }, data: { status } });
+  }
+
+  /**
+   * Blocking appointments for availability (PROMPT-10): same business,
+   * same date, not soft-deleted, PENDING/CONFIRMED — the exact rule
+   * `hasConflict`/`createWithConflictCheck` enforce for writes. Only
+   * the time interval is returned, as business-local "HH:mm" strings
+   * (epoch-based `@db.Time` values converted the same way the agenda
+   * serializer derives wall-clock times).
+   */
+  async listBlockingForDate(
+    businessId: string,
+    date: string,
+  ): Promise<Array<{ startTime: string; endTime: string }>> {
+    const rows = await db.appointment.findMany({
+      where: {
+        businessId,
+        ...notDeleted,
+        date: toDate(date),
+        status: { in: ["PENDING", "CONFIRMED"] as AppointmentStatus[] },
+      },
+      select: { startTime: true, endTime: true },
+      orderBy: { startTime: "asc" },
+      take: 200,
+    });
+    return rows.map((row) => ({
+      startTime: toWallClock(row.startTime),
+      endTime: toWallClock(row.endTime),
+    }));
   }
 
   /** Overlap check for a staff member (or the whole business when unassigned). */

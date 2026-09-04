@@ -2,7 +2,7 @@
 
 > ⚠️ CRITICAL: the authoritative progress ledger. Every agent MUST update
 > this file after finishing a prompt. Read it before starting any work.
-> Last updated: PROMPT-09 (Business Settings Foundation).
+> Last updated: PROMPT-10 (Smart Availability Foundation).
 
 ## Prompt 01 — Repository Foundation
 
@@ -2326,6 +2326,253 @@ onboarding/schemas/onboarding-schema.ts` (TIMEZONES re-export),
 
 ---
 
+## PROMPT-10 — Smart Availability Foundation
+
+**Status:** ✅ Complete
+
+> Operator prompt: SMART AVAILABILITY FOUNDATION. Deterministic,
+> business-scoped, service-duration-aware, working-hours-aware,
+> timezone-aware, conflict-aware availability domain/service layer that
+> can answer: "For this Business, on this date, for this active Service,
+> which start times are actually bookable?" Reusable by manual booking
+> and the future AI/WhatsApp booking agent. No UI, no AI, no WhatsApp
+> transport, no schema changes, no new dependencies.
+
+### PLAN
+
+1. Reuse the existing canonical slot-granularity policy
+   (`Business.slotDurationMinutes`, onboarding step 3) — no new setting,
+   field, or configurable scheduling system.
+2. Add ONE repository read primitive (`listBlockingForDate`) mirroring
+   the existing conflict rules exactly.
+3. Build the availability calculation in the appointments feature
+   (service layer + typed result contract + Zod input), with the actor's
+   Business derived server-side only.
+4. Expose one thin `"use server"` action as the future-consumer hook
+   (PROMPT-11 Smart Create Appointment Foundation).
+5. Verify via a temporary offline harness (in-memory repository
+   stand-ins running the REAL service code), then the full quality
+   gates; update docs; commit/tag/publish.
+
+### TODO Completion
+
+- [x] Read Tier 0 + task-relevant docs (vision, strategy, architecture,
+      SPEC_A, roadmap, decisions, build state, design system, glossary,
+      UX plan, database, current state, project status, GitHub workflow,
+      release process, feature READMEs)
+- [x] Inspect business/service/appointment models + repositories,
+      working-hours validation, timezone handling, conflict logic,
+      create/reschedule logic, status rules, shared utilities
+- [x] Confirm a canonical slot interval already exists
+      (`Business.slotDurationMinutes`) → REUSED, nothing invented
+- [x] `AppointmentRepository.listBlockingForDate` repository primitive
+- [x] Availability input schema (`{date, serviceId}` only)
+- [x] Availability types + typed result contract (slots / explicit
+      no-slots reasons / typed error codes)
+- [x] `getAvailability` deterministic calculation service
+- [x] `getAvailabilityAction` thin server action (future hook)
+- [x] Temporary verification harness (36/36 checks) — created, run,
+      removed
+- [x] Quality gates: db:generate / lint / typecheck / format:check /
+      verify / security
+- [x] Docs: BUILD_STATE / CURRENT_STATE / PROJECT_STATUS / DATABASE /
+      appointments README
+- [x] Release: commit + annotated tag v0.9.0 + push + GitHub Release
+
+### ALREADY PRESENT / REUSED (untouched in spirit)
+
+- `Business.workingHours` JSON week (single open/close interval per
+  weekday) — the EXISTING working-hours representation, validated by the
+  shared `workingHoursSchema`; not redesigned
+- `Business.slotDurationMinutes` — the canonical slot-granularity
+  policy (onboarding step 3 "إعدادات الحجز الأساسية"); reused as the
+  candidate-step, NO new business setting or scheduling system
+- `Business.timezone` — the stored domain timezone; reused (no new
+  timezone setting)
+- `Service.durationMinutes` / `Service.isActive` / soft-delete — the
+  ONLY service duration + activity source (no second duration field)
+- Appointment conflict lifecycle: blocking = not soft-deleted +
+  `PENDING`/`CONFIRMED` (identical to `hasConflict` /
+  `createWithConflictCheck` / `rescheduleWithConflictCheck`)
+- Feature conventions: actor + injectable repository deps + typed
+  results with Arabic messages (invitations/services pattern);
+  repositories remain the ONLY Prisma consumers (no feature-level
+  Prisma access)
+- `todayInTimezone` wall-clock semantics (appointments store
+  business-local "HH:mm" times) — availability speaks the same format
+
+### IMPLEMENTED IN THIS PROMPT
+
+- **`AppointmentRepository.listBlockingForDate(businessId, date)`** —
+  the single new repository primitive: tenant-scoped, `deletedAt: null`,
+  status `PENDING`/`CONFIRMED`, same-date, ordered by startTime,
+  returns plain `{startTime, endTime}` "HH:mm" pairs (epoch `@db.Time`
+  → wall-clock conversion, the agenda-serializer convention). No new
+  write paths, no schema change.
+- **Availability input schema**
+  (`schemas/availability-schema.ts`): `{date, serviceId}` ONLY — the
+  shared `appointmentDateSchema` + `uuidSchema`; Zod strips everything
+  else, so a hostile `businessId`/`role` override never reaches the
+  workflow. The Business is ALWAYS the actor's own, derived
+  server-side.
+- **Availability result contract** (`types.ts`): one small typed shape
+  — success carries `{date, timezone, serviceId,
+serviceDurationMinutes, slots: [{startTime, endTime}]}` plus an
+  explicit `reason` (`BUSINESS_CLOSED` | `SERVICE_TOO_LONG` |
+  `FULLY_BOOKED`) present ONLY when slots are empty; errors are typed
+  codes (`INVALID_INPUT` | `NO_BUSINESS` | `SERVICE_NOT_FOUND` |
+  `SERVICE_INACTIVE`) with Arabic messages. No internal database
+  details in the shape.
+- **`getAvailability(deps, actor, input)`**
+  (`server/availability-service.ts`): the deterministic calculation —
+  resolve the actor's Business → resolve the service (cross-Business →
+  `SERVICE_NOT_FOUND`, inactive → `SERVICE_INACTIVE`, soft-deleted →
+  not found through the repository's `deletedAt` filter) → derive the
+  weekday from the calendar date itself (timezone-independent) →
+  resolve the working interval (closed/missing/invalid entry →
+  `BUSINESS_CLOSED`) → generate candidates stepping by
+  `slotDurationMinutes` where the FULL service duration fits before
+  close (a 45-min service never starts 17:30 in a 10:00–18:00 day) →
+  filter overlaps against blocking appointments → typed result. Pure
+  helpers (`generateCandidateSlots`, `filterConflictingSlots`) are
+  exported for direct verification. No `Date.now()` in the calculation
+  path — deterministic repeated calls. Repository collaborators are
+  injectable (established pattern).
+- **`getAvailabilityAction`** (`actions/availability-actions.ts`): the
+  smallest integration hook — a thin `"use server"` wrapper that builds
+  the actor from the authenticated session + DB user (Business always
+  derived server-side; least-privilege fallback when the user record is
+  gone) and returns the typed result. This is the entry point the
+  future PROMPT-11 Smart Create flow consumes. NO UI was added.
+
+### NOT IMPLEMENTED (later prompts — per scope)
+
+- Smart Create Appointment UI / wizard / agenda redesign (PROMPT-11
+  consumes this service through `getAvailabilityAction`)
+- Availability-aware rescheduling UX, AI slot recommendation,
+  WhatsApp transport, reminders — all later Spec A slices
+- No changes to existing appointment screens (they remain functional
+  and untouched)
+
+### Generated / Changed Files
+
+`src/features/appointments/schemas/availability-schema.ts`,
+`src/features/appointments/server/availability-service.ts`,
+`src/features/appointments/actions/availability-actions.ts`,
+`src/features/appointments/types.ts` (availability contract added),
+`src/server/repositories/appointment.repository.ts`
+(`listBlockingForDate` + wall-clock helper),
+`src/features/appointments/README.md` (availability semantics);
+updated docs (`BUILD_STATE.md`, `CURRENT_STATE.md`,
+`PROJECT_STATUS.md`, `DATABASE.md`); `package.json` version → 0.9.0.
+No schema/migration changes.
+
+### Verification
+
+- Temporary tsx verification harness (removed after the run — Ops 05 /
+  PROMPT-03..09 pattern): **36/36 checks passed** offline with
+  in-memory repository stand-ins running the REAL service + schemas —
+  all 20 required categories: (1) open day → slots returned (10:00–17:00
+  starts, 45-min service, 30-min step, correct end times); (2) closed
+  day → zero slots with `BUSINESS_CLOSED`; (3) inactive service →
+  `SERVICE_INACTIVE`; (4) soft-deleted service → `SERVICE_NOT_FOUND`;
+  (5) exact-fit-until-closing slot valid (10:00→18:00 for a 480-min
+  service); (6) service longer than the day → `SERVICE_TOO_LONG` +
+  the prompt's 17:30-for-45-min example never generated; (7) blocking
+  appointment removes overlapping slots; (8) appointment ending at
+  12:00 does not block a 12:00 start (no false conflict); (9)
+  appointment starting at 12:00 does not block an 11:00→11:45 slot;
+  (10) candidate straddling an appointment start → rejected; (11)
+  candidate containing a whole appointment → rejected; (12) multiple
+  appointments → correct gap windows; (13) business timezone respected
+  (result carries the stored timezone; Friday late hours apply; a
+  different stored timezone yields the same wall-clock slots); (14)
+  requested date respected (other-date appointments never block; date
+  echoed verbatim); (15) cross-business appointments never block; (16)
+  hostile `businessId`/`role`/`isActive` payload keys ignored — the
+  actor's Business is the authority, and another Business's service →
+  `SERVICE_NOT_FOUND`; (17) every read flows through the injected
+  repository deps (counting wrapper proves business:1 / service:1 /
+  blocking:1 calls); (18) result shape exposes no database internals
+  (no businessId/customerId/deletedAt/token/Prisma keys; slots match
+  `^HH:mm$`); (19) zero slots always carries an explicit reason
+  (`FULLY_BOOKED` when the day is fully blocked); (20) deterministic
+  repeated calls (deep-equal results; STAFF actor identical slots).
+  Plus edge cases: invalid date formats (non-ISO, impossible calendar
+  date) / non-UUID serviceId / non-object input → `INVALID_INPUT`
+  before any repository access; actor without business →
+  `NO_BUSINESS`; unknown UUID → `SERVICE_NOT_FOUND`; missing
+  `workingHours` → closed (never 24h); CANCELLED/NO_SHOW/COMPLETED
+  never block; soft-deleted blocking appointment never blocks; slot
+  step follows `slotDurationMinutes` (15-min step → 15-min spacing,
+  17:30 exact fit valid); weekday mapping verified for all 7 weekdays;
+  close≤open entry → closed; pure slot generation matches the prompt's
+  example exactly; STAFF actor of the same business reads
+  availability; extra payload keys stripped without effect.
+- `pnpm db:generate` ✅ · `pnpm typecheck` ✅ · `pnpm lint` ✅ ·
+  `pnpm format:check` ✅
+- `pnpm verify` full gate: PASSED ✅ (lint 48.9s · typecheck 25.1s ·
+  format 33.8s · build --webpack 238.0s on the re-run after Prettier
+  formatting)
+- `pnpm security` ✅ (clean)
+- NOT verified on-device (environment limits, honestly stated):
+  real-database behavior of `listBlockingForDate` (this device has a
+  placeholder `DATABASE_URL` and cannot run the Prisma schema engine).
+  The real-DB path is the same repository conventions already used by
+  every existing appointment read; the workflow logic was verified
+  offline with the REAL service code against in-memory stand-ins.
+
+### Known Limitations
+
+- Availability is a READ layer only — it does not reserve slots; two
+  concurrent bookings for the same slot still rely on the existing
+  transactional conflict check at write time
+  (`createWithConflictCheck`), unchanged pilot-scale caveat.
+- Unassigned appointments block the whole business day (matching the
+  existing `createWithConflictCheck` semantics when no
+  `assignedUserId` is set — consistency with the write path was chosen
+  over per-staff scoping; staff-assignment-aware availability is a
+  later product decision).
+- Blocking reads cap at 200 rows/day (pilot volume far below); beyond
+  that, availability degrades gracefully by ignoring overflow rows.
+- No buffer/lead-time/rounding policies (no product decision exists
+  for them — none invented).
+- No UI consumes the service yet — by scope; PROMPT-11 (Smart Create
+  Appointment Foundation) is the designated consumer via
+  `getAvailabilityAction`.
+
+### Database / Migration State
+
+- **NO schema change.** The existing Business (workingHours, timezone,
+  slotDurationMinutes), Service (durationMinutes, isActive, deletedAt),
+  and Appointment (businessId, date, startTime, endTime, status,
+  deletedAt) models fully support availability.
+- One repository read primitive added (`listBlockingForDate`) — data
+  behavior only, documented in `DATABASE.md`; nothing to migrate.
+  Existing unapplied-on-device migrations
+  (`20260902120000`, `20260903120000`, `20260903130000`,
+  `20260903140000`) remain a desktop/CI `pnpm db:deploy` action,
+  unchanged by this prompt.
+
+### Release
+
+- Commit `feat(appointments): add deterministic availability
+foundation`; `package.json` version bumped to 0.9.0 (MINOR — new
+  product capability; `/api/health` reports the version).
+- Annotated tag `v0.9.0` — Smart Availability Foundation — points at
+  the PROMPT-10 commit. Published through the documented GitHub
+  publication workflow (PROMPT-05A..09 pattern: git state → origin
+  identity → gh auth → push main → verify tag target → push tag only →
+  `gh release create --verify-tag` → verify release published). The
+  legacy `pnpm release` doctor gate still blocks on this device's
+  placeholder `DATABASE_URL` (device-local, user action) and was not
+  used, per the operator's prompt instruction.
+- **Next step (product):** PROMPT-11 — Smart Create Appointment
+  Foundation (consumes this availability layer through
+  `getAvailabilityAction`). Do NOT implement it in this prompt.
+
+---
+
 - **Spec A progress:** foundation, onboarding (restructured in PROMPT-07
   to the 4-step operational-foundation wizard: بيانات المنشأة → ساعات
   العمل → إعدادات الحجز الأساسية → مراجعة وتشغيل, with vertical
@@ -2462,10 +2709,22 @@ password}` input and typed Arabic error mapping, safe sign-in →
   documented: default appointment duration (no clean domain
   representation — not invented), working-hours editing in settings,
   account activate/deactivate, knowledge screen.
-- **Next Step:** the next product prompt is decided by the operator from
-  this updated state. Natural Spec A candidate: **Customers Directory**
-  (Spec A §11 — the oldest remaining placeholder). Then business
-  knowledge screen → staff area → team (team includes the STAFF
-  invitation/activation UX composing the existing invitation services).
-  Do NOT combine unrelated areas.
+- **Smart availability foundation (PROMPT-10) complete:** deterministic
+  availability domain/service layer in the appointments feature —
+  `getAvailability` answers "which start times are actually bookable?"
+  from the Business's working hours + stored timezone + canonical
+  `slotDurationMinutes` step + `Service.durationMinutes` fit + the same
+  PENDING/CONFIRMED conflict rule the write path enforces
+  (`AppointmentRepository.listBlockingForDate`, the only new repository
+  primitive). Typed result contract with explicit no-slots reasons
+  (BUSINESS_CLOSED/SERVICE_TOO_LONG/FULLY_BOOKED) and typed Arabic
+  error codes; `getAvailabilityAction` is the thin server-action hook
+  for PROMPT-11 Smart Create. Zero schema changes, no UI, verified
+  offline 36/36 with in-memory stand-ins running the real service code.
+- **Next Step:** PROMPT-11 — Smart Create Appointment Foundation
+  (consumes the deterministic availability layer through
+  `getAvailabilityAction`). Do NOT combine unrelated areas. After that,
+  the remaining Spec A placeholders (customers directory, business
+  knowledge screen, team, staff area) proceed per the operator's
+  choice.
 - After each prompt: update this file and `DECISIONS.md`.
