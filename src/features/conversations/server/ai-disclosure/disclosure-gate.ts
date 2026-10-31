@@ -63,6 +63,7 @@ import {
   type AiRequest,
   type AiResponse,
 } from "@/features/conversations/server/ai-contract";
+import { normalizeArabicText } from "@/features/conversations/server/conversation-ai";
 
 // ─── Decisions (typed, never free text) ─────────────────────────────────────
 
@@ -238,21 +239,50 @@ export type DisclosureResult =
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 /** Does the request actually carry data for this support channel? */
-function channelCarried(request: AiRequest, channel: SupportChannel): boolean {
+function channelCarried(
+  request: AiRequest,
+  channel: SupportChannel,
+  response?: AiResponse,
+): boolean {
   switch (channel) {
-    case "faqs":
-      return request.faqs.length > 0;
+    case "faqs": {
+      if (request.faqs.length === 0) return false;
+      if (!response?.content) return true;
+      const normContent = normalizeArabicText(response.content);
+      const contentWords = new Set(
+        normContent.split(/\s+/).filter((w) => w.length >= 3),
+      );
+      return request.faqs.some((faq) => {
+        const normTarget = normalizeArabicText(`${faq.question} ${faq.answer}`);
+        const faqWords = normTarget.split(/\s+/).filter((w) => w.length >= 3);
+        return faqWords.some((w) => contentWords.has(w));
+      });
+    }
     case "availability":
       return (request.availability?.length ?? 0) > 0;
-    case "services":
-      // The service-catalog price channel (PROMPT-AI-ARCH-13 — Slice 6) is
-      // carried only when at least one exposed service has a non-empty price
-      // string (the context builder exposes it CONDITIONALLY, task-gated). An
-      // empty price channel means the reply would invent a price → refused.
+    case "services": {
+      // The service-catalog price channel (PROMPT-AI-ARCH-13 — Slice 6).
+      // If the response specifies an extracted service, that specific service
+      // must exist in request.services AND carry an authoritative price.
+      // Another service's price cannot authorize an unpriced service.
+      if (response?.extraction?.service) {
+        const target = normalizeArabicText(response.extraction.service);
+        const matching = request.services.find((s) => {
+          const norm = normalizeArabicText(s.name);
+          return (
+            norm === target || norm.includes(target) || target.includes(norm)
+          );
+        });
+        if (!matching) return false;
+        return (
+          typeof matching.price === "string" && matching.price.trim().length > 0
+        );
+      }
       return request.services.some(
         (service) =>
           typeof service.price === "string" && service.price.trim().length > 0,
       );
+    }
     case "businessAbout":
       // The PUBLIC business-about channel (PROMPT-AI-ARCH-15 — Slice 6) is
       // carried only when the turn was business-info relevant AND the
@@ -292,21 +322,73 @@ function channelCarried(request: AiRequest, channel: SupportChannel): boolean {
           typeof service.description === "string" &&
           service.description.trim().length > 0,
       );
-    case "serviceNames":
+    case "serviceNames": {
       // The PUBLIC service-catalog NAME channel (PROMPT-AI-OPS-20) is carried
       // whenever at least one service NAME is exposed in the catalog. B-01
       // already declares a service name "AI may mention" and B-02 always
       // carries the names in request.services; this channel lets the gate back
       // a catalog-listing reply from those carried names instead of refusing
-      // it. It licenses mentioning the CATALOG ONLY — never a price, location,
-      // hour or detail, each of which still requires its own carried channel.
-      return request.services.some(
-        (service) =>
-          typeof service.name === "string" && service.name.trim().length > 0,
-      );
+      // it. If response content is present, the reply must mention at least one
+      // service from request.services so that unrelated catalog names cannot
+      // authorize an arbitrary unknown-fact answer.
+      if (request.services.length === 0) return false;
+      if (!response?.content) return true;
+      const normContent = normalizeArabicText(response.content);
+      return request.services.some((service) => {
+        if (
+          typeof service.name !== "string" ||
+          service.name.trim().length === 0
+        ) {
+          return false;
+        }
+        const normName = normalizeArabicText(service.name);
+        return normName.length > 0 && normContent.includes(normName);
+      });
+    }
     case null:
       // No request channel exists for this family today.
       return false;
+  }
+}
+
+/**
+ * Pure mapping from a model-proposed requiredKnowledge string onto its canonical support family and channel.
+ */
+export function supportFamilyForProposedKnowledge(
+  key: string,
+): TaskSupportFamily | "GENERIC_FAQ" | null {
+  const norm = key.toLowerCase().trim();
+  switch (norm) {
+    case "business.identity":
+    case "identity":
+      return { family: "business.identity", channel: "businessName" };
+    case "business.address":
+    case "address":
+      return { family: "business.address", channel: "businessAddress" };
+    case "business.about":
+    case "about":
+      return { family: "business.about", channel: "businessAbout" };
+    case "service.price":
+    case "price":
+      return { family: "service.price", channel: "services" };
+    case "service.description":
+    case "description":
+      return { family: "service.description", channel: "serviceDescriptions" };
+    case "service.name":
+    case "service.catalog":
+    case "catalog":
+    case "service":
+      return { family: "service.name", channel: "serviceNames" };
+    case "business.faqs":
+      return { family: "business.faqs", channel: "faqs" };
+    case "domain.availability":
+    case "availability":
+      return { family: "domain.availability", channel: "availability" };
+    case "faq":
+    case "none":
+      return "GENERIC_FAQ";
+    default:
+      return null;
   }
 }
 
@@ -432,7 +514,7 @@ export function enforceDisclosure(input: DisclosureInput): DisclosureResult {
     if (!record.disclosable) {
       return { kind: "requires-human", reason: "NOT_DISCLOSABLE" };
     }
-    if (!channelCarried(context.request, candidate.channel)) {
+    if (!channelCarried(context.request, candidate.channel, response)) {
       return { kind: "requires-human", reason: "UNAVAILABLE_IN_REQUEST" };
     }
     return {
@@ -442,9 +524,50 @@ export function enforceDisclosure(input: DisclosureInput): DisclosureResult {
     };
   }
 
-  // For non-identity goals:
-  // On structured turns, business.identity is NOT a candidate for general FAQ/non-identity answers.
-  // Candidates are evaluated in order (faq, price, about, address, description, name).
+  // Support both existing requiredKnowledge representations:
+  // (1) top-level response.requiredKnowledge, (2) goal-level primary answer goal requiredKnowledge.
+  // requiredKnowledge is a model proposal, not factual proof:
+  // When proposed, the server evaluates ONLY that matching family against ledger and request.
+  const proposedKnowledge =
+    response.requiredKnowledge?.trim() ||
+    currentAnswerGoal?.requiredKnowledge?.trim() ||
+    null;
+
+  if (proposedKnowledge) {
+    const proposedCandidate =
+      supportFamilyForProposedKnowledge(proposedKnowledge);
+    if (proposedCandidate === null) {
+      // Model explicitly proposed an unknown or unbacked knowledge family -> fail closed
+      return { kind: "requires-human", reason: "EXCLUDED_FROM_CONTEXT" };
+    }
+    if (proposedCandidate !== "GENERIC_FAQ") {
+      if (!proposedCandidate.family) {
+        return { kind: "requires-human", reason: "EXCLUDED_FROM_CONTEXT" };
+      }
+      const family = proposedCandidate.family;
+      const record = ledger.find((fact) => fact.key === family);
+      if (!record || !record.included) {
+        return { kind: "requires-human", reason: "EXCLUDED_FROM_CONTEXT" };
+      }
+      if (!record.disclosable) {
+        return { kind: "requires-human", reason: "NOT_DISCLOSABLE" };
+      }
+      if (
+        !channelCarried(context.request, proposedCandidate.channel, response)
+      ) {
+        return { kind: "requires-human", reason: "UNAVAILABLE_IN_REQUEST" };
+      }
+      return {
+        kind: "disclosed",
+        response,
+        support: [family],
+      };
+    }
+  }
+
+  // Fallback candidate evaluation for turns without explicit proposed requiredKnowledge:
+  // On structured turns:
+  // - business.identity is NOT a candidate for general FAQ/non-identity answers (PROMPT-AI-UX-02).
   const isStructured =
     context.request.requiredSemanticCapability === "structured_turn";
   const candidates = candidateSupportFamilies(response.intent).filter(
@@ -463,7 +586,7 @@ export function enforceDisclosure(input: DisclosureInput): DisclosureResult {
       if (primaryRefusal === null) primaryRefusal = "NOT_DISCLOSABLE";
       continue;
     }
-    if (!channelCarried(context.request, candidate.channel)) {
+    if (!channelCarried(context.request, candidate.channel, response)) {
       if (primaryRefusal === null) primaryRefusal = "UNAVAILABLE_IN_REQUEST";
       continue;
     }
